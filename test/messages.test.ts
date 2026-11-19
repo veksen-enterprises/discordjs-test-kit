@@ -71,8 +71,8 @@ it("pins and unpins with Pin Messages, lists pins newest first, and announces ea
   expect(pins.items.map((p) => p.message.content)).toEqual(["faq", "rules"]);
   expect(pins.hasMore).toBe(false);
   await channel.messages.unpin(second.id);
-  const pinned = await channel.messages.fetchPinned();
-  expect(pinned.map((m) => m.content)).toEqual(["rules"]);
+  const afterUnpin = await channel.messages.fetchPins();
+  expect(afterUnpin.items.map((p) => p.message.content)).toEqual(["rules"]);
   mock.assertNoUnhandledRequests();
 });
 
@@ -83,10 +83,12 @@ it("pins and unpins through the deprecated routes @discordjs/core still calls", 
 
   // Act
   await client.rest.put(Routes.channelPin(channel.id, message.id));
+  const pinned = (await client.rest.get(Routes.channelPins(channel.id))) as {
+    content: string;
+  }[];
 
   // Assert
-  const pins = await channel.messages.fetchPins();
-  expect(pins.items.map((p) => p.message.content)).toEqual(["rules"]);
+  expect(pinned.map((m) => m.content)).toEqual(["rules"]);
   mock.assertNoUnhandledRequests();
 });
 
