@@ -89,6 +89,36 @@ it("refuses a channel the option doesn't offer, and a missing subcommand", async
   ).toThrow(/needs a subcommand: set/);
 });
 
+it("records commands for a guild the bot isn't in as unmodelled, and names that request when a command isn't registered", async () => {
+  // Arrange
+  const guild = mock.createGuild("ladder");
+  const general = mock.createTextChannel(guild, "general");
+  const alice = mock.createUser("alice");
+  mock.addMember(guild, alice);
+  client = new Client({
+    intents: [GatewayIntentBits.Guilds],
+    ...mock.clientOptions,
+  });
+  const ready = once(client, Events.ClientReady);
+  await client.login(mock.token);
+  await ready;
+  await client
+    .application!.commands.set([{ name: "ping", description: "Pings" }], "1")
+    .catch(() => {});
+
+  // Act
+  const run = () => mock.as(alice).slashCommand(general, "ping");
+
+  // Assert
+  expect(run).toThrow(
+    `its PUT /applications/${client.application!.id}/guilds/1/commands was answered 404`,
+  );
+  expect(mock.rest.unhandled).toEqual([
+    "guild commands for a guild the bot isn't in",
+  ]);
+  mock.rest.unhandled.length = 0;
+});
+
 it("hides a command from members without its default permissions", async () => {
   const { general, alice } = await start();
 

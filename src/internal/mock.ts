@@ -1185,8 +1185,19 @@ export class DiscordMock {
       const registered = this.state
         .commandsVisibleIn(guildId)
         .map((c) => `/${c.name}`);
+      // A refused registration (a guild id from a stale config, say) is the likelier cause than
+      // none at all, and the bot may have swallowed the error.
+      const refused = this.rest.log.find(
+        (r) =>
+          (r.method === "PUT" || r.method === "POST") &&
+          /^\/applications\/[^/]+\/(guilds\/[^/]+\/)?commands$/.test(r.path) &&
+          r.status >= 400,
+      );
+      const none = refused
+        ? `The bot registered no commands: its ${refused.method} ${refused.path} was answered ${refused.status}`
+        : "The bot registered no commands (it never PUT any to /applications/.../commands)";
       throw new Error(
-        `discordjs-test-kit: /${commandName} isn't registered. ${registered.length ? `Registered: ${registered.join(", ")}` : "The bot registered no commands (it never PUT any to /applications/.../commands)"}`,
+        `discordjs-test-kit: /${commandName} isn't registered. ${registered.length ? `Registered: ${registered.join(", ")}` : none}`,
       );
     }
     const guild = guildId ? this.state.requireGuild(guildId) : undefined;
@@ -1905,12 +1916,20 @@ export class DiscordMock {
       }),
     );
 
+    // Guild commands for a guild the bot isn't in: Discord refuses them, but how isn't documented,
+    // so it's a Gap rather than a 200 that stores commands no member can see.
+    const outsideGuild = (params: Record<string, string>) =>
+      params.guildId && !state.botIn(params.guildId)
+        ? rest.gap("guild commands for a guild the bot isn't in")
+        : undefined;
     const putCommands = (
       scope: (p: Record<string, string>) => string,
     ): RestHandler =>
       authed((req) => {
         if (req.params.appId !== state.applicationId)
           return respond.error(403, 50001, "Missing Access");
+        const outside = outsideGuild(req.params);
+        if (outside) return outside;
         // docs.discord.food/interactions/application-commands: a CHAT_INPUT command needs a description.
         const bodies = req.body as RESTPostAPIApplicationCommandsJSONBody[];
         if (
@@ -1940,10 +1959,12 @@ export class DiscordMock {
       rest.route(
         "GET",
         base,
-        authed((req) =>
-          respond.json([
-            ...(state.commands.get(scopeOf(req.params))?.values() ?? []),
-          ]),
+        authed(
+          (req) =>
+            outsideGuild(req.params) ??
+            respond.json([
+              ...(state.commands.get(scopeOf(req.params))?.values() ?? []),
+            ]),
         ),
       );
       // interactions/application-commands#create-global-application-command: an upsert, 201 for
@@ -1954,6 +1975,8 @@ export class DiscordMock {
         authed((req) => {
           if (req.params.appId !== state.applicationId)
             return respond.error(403, 50001, "Missing Access");
+          const outside = outsideGuild(req.params);
+          if (outside) return outside;
           const body = req.body as RESTPostAPIApplicationCommandsJSONBody;
           if (
             (body.type ?? 1) === 1 &&
@@ -1971,6 +1994,8 @@ export class DiscordMock {
         "GET",
         `${base}/:commandId`,
         authed((req) => {
+          const outside = outsideGuild(req.params);
+          if (outside) return outside;
           const command = state.commandById(
             scopeOf(req.params),
             req.params.commandId!,
@@ -1984,6 +2009,8 @@ export class DiscordMock {
         "PATCH",
         `${base}/:commandId`,
         authed((req) => {
+          const outside = outsideGuild(req.params);
+          if (outside) return outside;
           const scope = scopeOf(req.params);
           const previous = state.commandById(scope, req.params.commandId!);
           if (!previous) return unknownCommand();
@@ -2002,10 +2029,12 @@ export class DiscordMock {
       rest.route(
         "DELETE",
         `${base}/:commandId`,
-        authed((req) =>
-          state.deleteCommand(scopeOf(req.params), req.params.commandId!)
-            ? respond.noContent()
-            : unknownCommand(),
+        authed(
+          (req) =>
+            outsideGuild(req.params) ??
+            (state.deleteCommand(scopeOf(req.params), req.params.commandId!)
+              ? respond.noContent()
+              : unknownCommand()),
         ),
       );
     }

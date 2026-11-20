@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Changed
+
+- Registering commands for a server the bot isn't in used to succeed. Discord refuses it, so the test now fails and names the request. Running a command afterwards says which registration was refused, instead of saying the bot never registered any.
+
+### Added
+
 - Stickers: `client.fetchSticker(id)` and `sticker.fetch()`.
 - Widget: `client.fetchGuildWidget()` and `guild.fetchWidget()`, showing public voice channels and online members.
 - Guild preview: `client.fetchGuildPreview()` and `guild.fetchPreview()` for a guild the bot is in.
