@@ -1839,6 +1839,7 @@ export class DiscordMock {
     // `avatar` (image data or null); the other fields are for user accounts or premium, so they're
     // a Gap. The `token` field the docs add is a user account's new token: a bot's doesn't change,
     // so it's left out (inferred). A bad username or image answering 50035 is inferred.
+    // `image/jpg` is accepted: discord.js's resolveBase64 labels every file it reads that way.
     rest.route(
       "PATCH",
       "/users/@me",
@@ -1858,7 +1859,7 @@ export class DiscordMock {
         if (
           "avatar" in body &&
           body.avatar !== null &&
-          !/^data:image\/(png|jpeg|gif|webp);base64,/.test(String(body.avatar))
+          !/^data:image\/(png|jpe?g|gif|webp);base64,/.test(String(body.avatar))
         )
           return respond.invalidFormBody();
         if ("username" in body) state.bot.username = body.username as string;

@@ -54,6 +54,19 @@ it("sets the bot's avatar from image data", async () => {
   expect(user.avatar).toMatch(/^[0-9a-f]{32}$/);
 });
 
+it("sets the bot's avatar from a file, which discord.js sends as image/jpg", async () => {
+  // Arrange
+  await login();
+
+  // Act
+  const user = await client.user!.setAvatar(
+    Buffer.from(PNG.split(",")[1]!, "base64"),
+  );
+
+  // Assert
+  expect(user.avatar).toMatch(/^[0-9a-f]{32}$/);
+});
+
 it("refuses a one-letter username", async () => {
   // Arrange
   await login();
