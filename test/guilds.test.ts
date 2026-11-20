@@ -186,3 +186,24 @@ it("records a widget with an invite channel as unmodelled, since its invite isn'
   expect(mock.rest.unhandled).toEqual(["widget.json with an invite channel"]);
   mock.rest.unhandled.length = 0;
 });
+
+it("previews a guild the bot is in, with its member and online counts", async () => {
+  // Arrange
+  const record = mock.createGuild("Titan");
+  const alice = mock.createUser("alice");
+  const bob = mock.createUser("bob");
+  mock.addMember(record, alice);
+  mock.addMember(record, bob);
+  setPresence(mock, alice, { status: "online" });
+  await login();
+
+  // Act
+  const preview = await client.fetchGuildPreview(record.id);
+
+  // Assert
+  expect({
+    name: preview.name,
+    members: preview.approximateMemberCount,
+    online: preview.approximatePresenceCount,
+  }).toEqual({ name: "Titan", members: record.members.size, online: 1 });
+});

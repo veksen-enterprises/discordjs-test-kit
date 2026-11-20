@@ -136,6 +136,43 @@ export function registerGuildRoutes(
     }),
   );
 
+  // Get Guild Preview (discord-api-docs resources/guild, docs.discord.food/resources/guild): "If
+  // the user is not in the guild, the guild must be discoverable". The World has no discoverable
+  // guilds, and the refusal isn't documented, so a guild the bot isn't in is a Gap. Emojis and
+  // stickers leave out `user`, as in the guild object (inferred).
+  rest.route(
+    "GET",
+    "/guilds/:guildId/preview",
+    authed((req) => {
+      const guild = state.guilds.get(req.params.guildId!);
+      if (!guild) return unknownGuild();
+      if (!state.botIn(guild.id))
+        return rest.gap("a preview of a guild the bot isn't in");
+      const { id, name, icon, splash, discovery_splash, features } =
+        guildPayload(guild);
+      const strip = <T extends { user: unknown }>({ user: _, ...item }: T) =>
+        item;
+      return respond.json({
+        id,
+        name,
+        icon,
+        splash,
+        discovery_splash,
+        features,
+        description: null,
+        emojis: [...guild.emojis.values()].map(strip),
+        stickers: [...guild.stickers.values()].map(strip),
+        approximate_member_count: guild.members.size,
+        approximate_presence_count: [...guild.members.keys()].filter(
+          (userId) => {
+            const status = state.presences.get(userId)?.status;
+            return status !== undefined && status !== "offline";
+          },
+        ).length,
+      });
+    }),
+  );
+
   // Get Guild Widget (discord-api-docs resources/guild, docs.discord.food/resources/guild): the
   // public widget, no permission. "The guild must have the widget enabled": 50004 is discord-api-
   // types' GuildWidgetDisabled; the 403 is inferred, not checked. With an invite channel set,

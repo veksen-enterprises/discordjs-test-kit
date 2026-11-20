@@ -4,6 +4,7 @@
 
 - Stickers: `client.fetchSticker(id)` and `sticker.fetch()`.
 - Widget: `client.fetchGuildWidget()` and `guild.fetchWidget()`, showing public voice channels and online members.
+- Guild preview: `client.fetchGuildPreview()` and `guild.fetchPreview()` for a guild the bot is in.
 
 ## 0.4.0
 

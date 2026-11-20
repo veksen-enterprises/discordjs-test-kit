@@ -1,7 +1,7 @@
 {
   "discordApiTypes": "0.38.59",
   "rest": {
-    "covered": 157,
+    "covered": 158,
     "botCallable": 213,
     "notBotCallable": 15
   },
@@ -78,6 +78,7 @@
     "GET /guilds/:/members",
     "GET /guilds/:/members/:",
     "GET /guilds/:/members/search",
+    "GET /guilds/:/preview",
     "GET /guilds/:/prune",
     "GET /guilds/:/roles",
     "GET /guilds/:/roles/:",
