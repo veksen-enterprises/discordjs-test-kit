@@ -72,6 +72,7 @@ import { snowflake } from "./snowflake.js";
 import { registerSoundboardRoutes } from "./soundboard.js";
 import { endStage, registerStageRoutes, startStage } from "./stages.js";
 import { DiscordState, type GuildRecord } from "./state.js";
+import { registerTemplateRoutes } from "./templates.js";
 import {
   addMentionedToPrivateThread,
   registerThreadRoutes,
@@ -3042,6 +3043,7 @@ export class DiscordMock {
     registerMemberRoutes(this, authed);
     registerGuildRoutes(this, authed);
     registerInviteRoutes(this, authed);
+    registerTemplateRoutes(this, authed);
     registerVoiceRoutes(this, authed);
     registerScheduledEventRoutes(this, authed);
     registerExpressionRoutes(this, authed);

@@ -1,7 +1,7 @@
 {
   "discordApiTypes": "0.38.59",
   "rest": {
-    "covered": 158,
+    "covered": 164,
     "botCallable": 213,
     "notBotCallable": 15
   },
@@ -33,6 +33,7 @@
     "DELETE /guilds/:/scheduled-events/:",
     "DELETE /guilds/:/soundboard-sounds/:",
     "DELETE /guilds/:/stickers/:",
+    "DELETE /guilds/:/templates/:",
     "DELETE /invites/:",
     "DELETE /stage-instances/:",
     "DELETE /users/@me/guilds/:",
@@ -90,12 +91,14 @@
     "GET /guilds/:/soundboard-sounds/:",
     "GET /guilds/:/stickers",
     "GET /guilds/:/stickers/:",
+    "GET /guilds/:/templates",
     "GET /guilds/:/threads/active",
     "GET /guilds/:/voice-states/:",
     "GET /guilds/:/voice-states/@me",
     "GET /guilds/:/webhooks",
     "GET /guilds/:/widget",
     "GET /guilds/:/widget.json",
+    "GET /guilds/templates/:",
     "GET /invites/:",
     "GET /stage-instances/:",
     "GET /stickers/:",
@@ -123,6 +126,7 @@
     "PATCH /guilds/:/scheduled-events/:",
     "PATCH /guilds/:/soundboard-sounds/:",
     "PATCH /guilds/:/stickers/:",
+    "PATCH /guilds/:/templates/:",
     "PATCH /guilds/:/voice-states/:",
     "PATCH /guilds/:/voice-states/@me",
     "PATCH /guilds/:/widget",
@@ -154,6 +158,7 @@
     "POST /guilds/:/scheduled-events",
     "POST /guilds/:/soundboard-sounds",
     "POST /guilds/:/stickers",
+    "POST /guilds/:/templates",
     "POST /interactions/:/:/callback",
     "POST /stage-instances",
     "POST /users/@me/channels",
@@ -167,7 +172,8 @@
     "PUT /channels/:/thread-members/:",
     "PUT /channels/:/thread-members/@me",
     "PUT /guilds/:/bans/:",
-    "PUT /guilds/:/members/:/roles/:"
+    "PUT /guilds/:/members/:/roles/:",
+    "PUT /guilds/:/templates/:"
   ],
   "gatewayCovered": [
     "APPLICATION_COMMAND_PERMISSIONS_UPDATE",

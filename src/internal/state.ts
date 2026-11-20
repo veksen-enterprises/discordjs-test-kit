@@ -28,6 +28,19 @@ import {
 } from "discord-api-types/v10";
 import { snowflake } from "./snowflake.js";
 
+/** A guild template (resources/guild-template): a snapshot of its guild, kept until synced. */
+export interface TemplateRecord {
+  code: string;
+  guildId: string;
+  creatorId: string;
+  name: string;
+  description: string | null;
+  created_at: string;
+  updated_at: string;
+  /** The guild as it was when the template was made or last synced. */
+  snapshot: Record<string, unknown>;
+}
+
 /** An invite: Discord's invite object plus its metadata (resources/invite). */
 export interface InviteRecord {
   code: string;
@@ -120,6 +133,8 @@ export class DiscordState extends EventEmitter<{
   readonly autoModRules = new Map<string, APIAutoModerationRule>();
   /** Guild scheduled events by id. */
   readonly scheduledEvents = new Map<string, APIGuildScheduledEvent>();
+  /** Guild templates by code. */
+  readonly templates = new Map<string, TemplateRecord>();
   /** Each user's presence once they set one; nobody in it is offline. */
   readonly presences = new Map<
     string,
