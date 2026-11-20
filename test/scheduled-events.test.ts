@@ -172,6 +172,47 @@ it("creates an event at a place outside Discord, with the bot interested", async
   ]);
 });
 
+// A 1x1 PNG, as discord.js sends an image: a buffer it turns into a data URI.
+const COVER = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
+  "base64",
+);
+
+it("creates an event with a cover image, and replaces the cover", async () => {
+  // Arrange
+  const { guild } = await botWithEvents(HOST);
+  const event = await guild.scheduledEvents.create({
+    ...tournament,
+    image: COVER,
+  });
+  const first = event.image;
+
+  // Act
+  const edited = await event.edit({ image: COVER });
+
+  // Assert
+  expect(first).toMatch(/^[0-9a-f]{32}$/);
+  expect(edited.image).toMatch(/^[0-9a-f]{32}$/);
+  expect(edited.image).not.toBe(first);
+  expect(edited.coverImageURL()).toContain(
+    `/guild-events/${event.id}/${edited.image}`,
+  );
+});
+
+it("refuses a cover that isn't an image", async () => {
+  // Arrange
+  const { guild } = await botWithEvents(HOST);
+
+  // Act
+  const created = guild.scheduledEvents.create({
+    ...tournament,
+    image: "data:text/plain;base64,aGk=",
+  });
+
+  // Assert
+  await expect(created).rejects.toMatchObject({ code: 50035 });
+});
+
 it("creates an event in a voice channel", async () => {
   // Arrange
   const { guild, lobby } = await botWithEvents(HOST);

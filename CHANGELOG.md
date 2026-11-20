@@ -14,6 +14,7 @@
 - Guild preview: `client.fetchGuildPreview()` and `guild.fetchPreview()` for a guild the bot is in.
 - Guild templates: `guild.createTemplate()`, `fetchTemplates()`, `client.fetchGuildTemplate()`, and a template's `sync()`, `edit()` and `delete()`.
 - Soundboard: `voiceChannel.sendSoundboardSound()` plays one of the guild's sounds in the voice channel the bot is in, heard as `voiceChannelEffectSend`.
+- Scheduled events: a cover image on `scheduledEvents.create()` and `event.edit()`.
 
 ## 0.4.0
 

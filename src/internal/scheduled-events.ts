@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import {
   AuditLogEvent,
   ChannelType,
@@ -333,11 +334,23 @@ export function registerScheduledEventRoutes(
   };
   const isTime = (value: unknown) =>
     typeof value === "string" && !Number.isNaN(Date.parse(value));
+  // The cover is image data (docs.discord.food/reference#cdn-data); the event keeps its hash. The
+  // CDN serves covers as PNG, JPEG or WebP, so another type answering 50035 is inferred; a GIF,
+  // which CDN data allows but the cover endpoint doesn't list, is a Gap. The hash is random: only
+  // its presence is observable. `image/jpg` is what discord.js's resolveBase64 sends for a file.
+  const coverProblem = (image: unknown) => {
+    if (/^data:image\/(png|jpe?g|webp);base64,/.test(String(image)))
+      return undefined;
+    if (/^data:image\/gif;base64,/.test(String(image)))
+      return rest.gap("a GIF scheduled event cover");
+    return respond.invalidFormBody();
+  };
+  const coverHash = () => randomBytes(16).toString("hex");
 
   // Create Guild Scheduled Event. Required: name, privacy_level (GUILD_ONLY is the only level),
   // scheduled_start_time, entity_type; a VOICE event needs a voice channel_id, an EXTERNAL one
-  // entity_metadata.location and scheduled_end_time. Stage events, image and recurrence_rule are
-  // a Gap, as is the 100 SCHEDULED/ACTIVE limit, whose error isn't documented. Bad input
+  // entity_metadata.location and scheduled_end_time. `image` sets the cover. Stage events and
+  // recurrence_rule are a Gap, as is the 100 SCHEDULED/ACTIVE limit, whose error isn't documented. Bad input
   // answering 50035, and 50013 for missing permissions, are inferred.
   rest.route(
     "POST",
@@ -348,7 +361,10 @@ export function registerScheduledEventRoutes(
       const body = (req.body ?? {}) as Record<string, unknown>;
       if (body.entity_type === GuildScheduledEventEntityType.StageInstance)
         return rest.gap("a stage scheduled event");
-      if (body.image != null) return rest.gap("a scheduled event image");
+      if (body.image != null) {
+        const problem = coverProblem(body.image);
+        if (problem) return problem;
+      }
       if (body.recurrence_rule != null)
         return rest.gap("a recurring scheduled event");
       const active = scheduledEventsIn(mock, guild.id).filter(
@@ -408,7 +424,7 @@ export function registerScheduledEventRoutes(
         entity_type: body.entity_type,
         entity_id: null,
         entity_metadata: external ? { location } : null,
-        image: null,
+        image: body.image != null ? coverHash() : null,
         recurrence_rule: null,
       } as APIGuildScheduledEvent;
       addEvent(mock, guild, state.bot.id, event, reasonOf(req));
@@ -417,8 +433,9 @@ export function registerScheduledEventRoutes(
   );
 
   // Modify Guild Scheduled Event. "Only the following are valid status changes: SCHEDULED -->
-  // ACTIVE, ACTIVE --> COMPLETED, SCHEDULED --> CANCELED". Changing channel_id or entity_type,
-  // image and recurrence_rule are a Gap. Someone else's event needs Manage Events. An invalid
+  // ACTIVE, ACTIVE --> COMPLETED, SCHEDULED --> CANCELED". `image` replaces the cover; null isn't
+  // documented as removing it, so that's a Gap. Changing channel_id or entity_type, and
+  // recurrence_rule, are a Gap. Someone else's event needs Manage Events. An invalid
   // change answering 50035 is inferred.
   const MODIFIABLE = [
     "name",
@@ -428,6 +445,7 @@ export function registerScheduledEventRoutes(
     "status",
     "entity_metadata",
     "privacy_level",
+    "image",
   ];
   const NEXT_STATUS: Partial<
     Record<GuildScheduledEventStatus, GuildScheduledEventStatus[]>
@@ -451,6 +469,12 @@ export function registerScheduledEventRoutes(
       if (other) return rest.gap(`PATCH a scheduled event's ${other}`);
       if (eventPermissionProblem(mock, guild, state.bot.id, event))
         return respond.missingPermissions();
+      if ("image" in body) {
+        if (body.image === null)
+          return rest.gap("removing a scheduled event's cover");
+        const problem = coverProblem(body.image);
+        if (problem) return problem;
+      }
       const status = body.status as GuildScheduledEventStatus | undefined;
       const location = (body.entity_metadata as { location?: unknown } | null)
         ?.location;
@@ -494,6 +518,7 @@ export function registerScheduledEventRoutes(
       if (status !== undefined) changed.status = status;
       if ("entity_metadata" in body)
         changed.entity_metadata = { location: location as string };
+      if ("image" in body) event.image = coverHash();
       announce(mock, GatewayDispatchEvents.GuildScheduledEventUpdate, event);
       recordAudit(mock, guild, {
         action_type: AuditLogEvent.GuildScheduledEventUpdate,
