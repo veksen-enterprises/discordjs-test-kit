@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Stickers: `client.fetchSticker(id)` and `sticker.fetch()`.
+- Widget: `client.fetchGuildWidget()` and `guild.fetchWidget()`, showing public voice channels and online members.
 
 ## 0.4.0
 

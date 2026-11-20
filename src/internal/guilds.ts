@@ -1,3 +1,5 @@
+import { randomBytes } from "node:crypto";
+import { ChannelType, type APIChannel } from "discord-api-types/v10";
 import type { DiscordMock } from "./mock.js";
 import { computePermissions, guildPayload, Permission } from "./payloads.js";
 import { respond, type RestHandler } from "./rest.js";
@@ -131,6 +133,86 @@ export function registerGuildRoutes(
       if (body.channel_id !== undefined)
         guild!.widget.channel_id = body.channel_id;
       return respond.json(guild!.widget);
+    }),
+  );
+
+  // Get Guild Widget (discord-api-docs resources/guild, docs.discord.food/resources/guild): the
+  // public widget, no permission. "The guild must have the widget enabled": 50004 is discord-api-
+  // types' GuildWidgetDisabled; the 403 is inferred, not checked. With an invite channel set,
+  // Discord makes an invite on the first fetch, but neither page says whose it is or when it
+  // expires, so that's a Gap. Channels: "voice and stage channels which are accessible by
+  // @everyone", read as View Channel and Connect (inferred). Members: up to 100 non-offline ones,
+  // with `id`, `discriminator` and `avatar` "anonymized": the docs' examples count ids up from "0"
+  // with discriminator "0000" and avatar null. The username shown, the member order, and the voice
+  // fields appearing only for a member in voice are inferred. The bot's own presence isn't
+  // modelled, so it's never listed.
+  rest.route(
+    "GET",
+    "/guilds/:guildId/widget.json",
+    authed((req) => {
+      const guild = state.guilds.get(req.params.guildId!);
+      if (!guild) return unknownGuild();
+      if (!guild.widget.enabled)
+        return respond.error(403, 50004, "Widget Disabled");
+      if (guild.widget.channel_id)
+        return rest.gap("widget.json with an invite channel");
+      const everyone = (channel: APIChannel) => {
+        const overwrite =
+          "permission_overwrites" in channel
+            ? channel.permission_overwrites?.find((o) => o.id === guild.id)
+            : undefined;
+        let perms = BigInt(guild.roles.get(guild.id)!.permissions);
+        if (perms & Permission.Administrator) return true;
+        if (overwrite)
+          perms = (perms & ~BigInt(overwrite.deny)) | BigInt(overwrite.allow);
+        const needed = Permission.ViewChannel | Permission.Connect;
+        return (perms & needed) === needed;
+      };
+      const channels = guild.channelIds
+        .map((id) => state.requireChannel(id))
+        .filter(
+          (c) =>
+            (c.type === ChannelType.GuildVoice ||
+              c.type === ChannelType.GuildStageVoice) &&
+            everyone(c),
+        )
+        .map((c) => ({
+          id: c.id,
+          name: c.name!,
+          position: "position" in c ? c.position : 0,
+        }));
+      const online = [...guild.members.keys()]
+        .map((id) => ({ id, presence: state.presences.get(id) }))
+        .filter((m) => m.presence && m.presence.status !== "offline");
+      const members = online.slice(0, 100).map(({ id, presence }, index) => {
+        const voice = state.voiceStates.get(guild.id)?.get(id);
+        const activity = presence!.activities?.[0];
+        return {
+          id: String(index),
+          username: state.requireUser(id).username,
+          discriminator: "0000",
+          avatar: null,
+          status: presence!.status,
+          avatar_url: `${state.cdnUrl}/widget-avatars/${randomBytes(16).toString("base64url")}`,
+          ...(activity && { activity: { name: activity.name } }),
+          ...(voice?.channel_id && {
+            channel_id: voice.channel_id,
+            deaf: voice.deaf,
+            mute: voice.mute,
+            self_deaf: voice.self_deaf,
+            self_mute: voice.self_mute,
+            suppress: voice.suppress,
+          }),
+        };
+      });
+      return respond.json({
+        id: guild.id,
+        name: guild.name,
+        instant_invite: null,
+        channels,
+        members,
+        presence_count: online.length,
+      });
     }),
   );
 }

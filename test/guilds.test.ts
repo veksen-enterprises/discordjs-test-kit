@@ -3,6 +3,7 @@ import { Client, Events, GatewayIntentBits } from "discord.js";
 import { afterEach, beforeEach, expect, it } from "vitest";
 import { createDiscordMock, type DiscordMock } from "../src/internal/mock.js";
 import { Permission } from "../src/internal/payloads.js";
+import { setPresence } from "../src/internal/presence.js";
 
 let mock: DiscordMock;
 let client: Client;
@@ -110,4 +111,78 @@ it("refuses to read the widget settings without Manage Server", async () => {
 
   // Assert
   await expect(settings).rejects.toMatchObject({ code: 50013 });
+});
+
+it("shows the public widget: voice channels @everyone can join, and members who are online", async () => {
+  // Arrange
+  const record = mock.createGuild("g");
+  record.widget.enabled = true;
+  mock.createTextChannel(record, "general");
+  const lounge = mock.createVoiceChannel(record, "Lounge");
+  const staff = mock.createVoiceChannel(record, "Staff");
+  mock.setOverwrite(
+    staff,
+    { id: record.id, type: 0 },
+    { deny: Permission.ViewChannel },
+  );
+  const alice = mock.createUser("alice");
+  const bob = mock.createUser("bob");
+  mock.addMember(record, alice);
+  mock.addMember(record, bob);
+  setPresence(mock, alice, {
+    status: "dnd",
+    activity: { name: "Chess", type: 0 },
+  });
+  mock.joinVoice(record, alice, lounge);
+  await login();
+
+  // Act
+  const widget = await client.fetchGuildWidget(record.id);
+
+  // Assert
+  expect([...widget.channels.values()].map((c) => c.name)).toEqual(["Lounge"]);
+  const [member, ...others] = widget.members.values();
+  expect(others).toEqual([]);
+  expect({
+    id: member!.id,
+    username: member!.username,
+    status: member!.status,
+    activity: member!.activity,
+    channelId: member!.channelId,
+  }).toEqual({
+    id: "0",
+    username: "alice",
+    status: "dnd",
+    activity: { name: "Chess" },
+    channelId: lounge.id,
+  });
+  expect(widget.presenceCount).toBe(1);
+});
+
+it("answers Widget Disabled for a guild whose widget is off", async () => {
+  // Arrange
+  const record = mock.createGuild("g");
+  await login();
+
+  // Act
+  const widget = client.fetchGuildWidget(record.id);
+
+  // Assert
+  await expect(widget).rejects.toMatchObject({ code: 50004 });
+});
+
+it("records a widget with an invite channel as unmodelled, since its invite isn't documented", async () => {
+  // Arrange
+  const record = mock.createGuild("g");
+  const welcome = mock.createTextChannel(record, "welcome");
+  record.widget = { enabled: true, channel_id: welcome.id };
+  await login();
+
+  // Act
+  const widget = client.fetchGuildWidget(record.id);
+
+  // Assert
+  await expect(widget).rejects.toMatchObject({ code: 0 });
+  expect(mock.rest.unhandled).toEqual(["widget.json with an invite channel"]);
+  mock.rest.unhandled.length = 0;
 });
