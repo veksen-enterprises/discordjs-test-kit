@@ -135,6 +135,37 @@ it("fetches one guild sticker by id", async () => {
   expect(sticker.name).toBe("wave");
 });
 
+it("fetches a sticker by id alone, without its uploader", async () => {
+  // Arrange
+  const guild = mock.createGuild("g");
+  const mod = mock.createUser("mod");
+  mock.addMember(guild, mod);
+  mock.createRole(guild, "mods", Permission.CreateGuildExpressions, [mod]);
+  const wave = uploadExpression(mock, guild, mod, "sticker", "wave");
+  await login([GatewayIntentBits.Guilds]);
+
+  // Act
+  const sticker = await client.fetchSticker(wave);
+
+  // Assert
+  expect([sticker.name, sticker.guildId, sticker.user]).toEqual([
+    "wave",
+    guild.id,
+    null,
+  ]);
+});
+
+it("answers Unknown Sticker for an id that is no sticker", async () => {
+  // Arrange
+  await login([GatewayIntentBits.Guilds]);
+
+  // Act
+  const fetched = client.fetchSticker("1");
+
+  // Assert
+  await expect(fetched).rejects.toMatchObject({ code: 10060 });
+});
+
 const PNG_FILE = Buffer.from(PNG.split(",")[1]!, "base64");
 
 async function botWithStickers(botPermissions: bigint) {

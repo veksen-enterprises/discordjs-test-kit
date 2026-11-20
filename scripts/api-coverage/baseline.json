@@ -1,7 +1,7 @@
 {
   "discordApiTypes": "0.38.59",
   "rest": {
-    "covered": 155,
+    "covered": 156,
     "botCallable": 213,
     "notBotCallable": 15
   },
@@ -96,6 +96,7 @@
     "GET /guilds/:/widget",
     "GET /invites/:",
     "GET /stage-instances/:",
+    "GET /stickers/:",
     "GET /users/:",
     "GET /users/@me",
     "GET /users/@me/guilds",

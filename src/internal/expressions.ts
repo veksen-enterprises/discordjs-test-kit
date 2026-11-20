@@ -333,6 +333,25 @@ export function registerExpressionRoutes(
     }),
   );
 
+  // Get Sticker (docs.discord.food/resources/sticker): any sticker by id, for client.fetchSticker()
+  // and sticker.fetch(). `user` is documented only for List and Get Guild Sticker, so it's left out.
+  // Standard stickers aren't modelled, so an id that's no guild's sticker answers 10060. A sticker
+  // from a guild the bot isn't in is a Gap: the page doesn't say whether Discord serves it.
+  rest.route(
+    "GET",
+    "/stickers/:stickerId",
+    authed((req) => {
+      for (const guild of state.guilds.values()) {
+        const sticker = guild.stickers.get(req.params.stickerId!);
+        if (!sticker) continue;
+        if (!state.botIn(guild.id))
+          return rest.gap("a sticker from a guild the bot isn't in");
+        return respond.json(shown(sticker, false));
+      }
+      return unknownSticker();
+    }),
+  );
+
   // Create Guild Emoji: CREATE_GUILD_EXPRESSIONS; `image` is image data (reference#image-data, a
   // data URI). A GIF is animated (inferred from the image type). Over 256 KiB Discord answers 400
   // without a JSON code, so that's a Gap; so is an image that isn't a data URI (error inferred).

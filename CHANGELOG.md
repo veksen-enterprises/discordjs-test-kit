@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Stickers: `client.fetchSticker(id)` and `sticker.fetch()`.
+
 ## 0.4.0
 
 More of Discord's API works when your bot calls it, instead of failing the test as unsupported:
