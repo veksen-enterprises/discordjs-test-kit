@@ -83,7 +83,7 @@ it("hands the bot the overrides an admin set, and announces each change", async 
 it("lets a member an override allows run a command they lack the default permissions for", async () => {
   const { guild, general, alice, ban } = await start();
   expect(() => mock.as(alice).slashCommand(general, "ban", {})).toThrow(
-    "needs permissions",
+    "it's for administrators only",
   );
 
   setCommandPermissions(mock, guild, ban.id, [

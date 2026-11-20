@@ -6,6 +6,7 @@
 
 - Registering commands for a server the bot isn't in used to succeed. Discord refuses it, so the test now fails and names the request. Running a command afterwards says which registration was refused, instead of saying the bot never registered any.
 - `client.user.setAvatar()` with a file or URL works: it used to fail with Invalid Form Body, because discord.js labels such images `image/jpg`.
+- A member refused a command is told which permissions it needs by name (`ManageGuild`), not as a number, and an administrators-only command says so.
 
 ### Added
 

@@ -104,6 +104,14 @@ export interface FileUpload {
   contentType: string;
 }
 
+/** `bits` as the permission names a test author knows, e.g. "ManageGuild, BanMembers". */
+function permissionNames(bits: bigint) {
+  const names = Object.entries(Permission)
+    .filter(([, bit]) => bit !== 0n && (bits & bit) === bit)
+    .map(([name]) => name);
+  return names.length ? names.join(", ") : String(bits);
+}
+
 export interface UserMessage {
   content?: string;
   files?: FileUpload[];
@@ -1294,7 +1302,7 @@ export class DiscordMock {
       has === ALL_PERMISSIONS || (needed !== 0n && (has & needed) === needed);
     if (!allowed)
       throw new Error(
-        `discordjs-test-kit: ${user.username} can't use ${shownName}: it needs permissions ${needed}`,
+        `discordjs-test-kit: ${user.username} can't use ${shownName}: ${needed === 0n ? "it's for administrators only (default member permissions 0)" : `it needs permissions ${permissionNames(needed)}`}`,
       );
   }
 

@@ -390,7 +390,7 @@ it("tells the bot a member joined and left voice", async () => {
 it("lets an admin open an admin-only command to one member", async () => {
   const { discord, server, generalChannel, alice, bob } = await startBot();
   await expect(alice.runCommand(generalChannel, "settings")).rejects.toThrow(
-    "needs permissions",
+    "needs permissions ManageGuild",
   );
 
   discord.setCommandPermissions(server, "settings", [
