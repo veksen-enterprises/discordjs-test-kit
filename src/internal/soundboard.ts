@@ -1,5 +1,6 @@
 import {
   AuditLogEvent,
+  ChannelType,
   GatewayDispatchEvents,
   GatewayIntentBits,
   RESTJSONErrorCodes,
@@ -218,6 +219,64 @@ export function registerSoundboardRoutes(
         changes: [{ key: "name", old_value: sound.name }],
         reason: reasonOf(req),
       });
+      return respond.noContent();
+    }),
+  );
+
+  // Send Soundboard Sound (discord-api-docs resources/soundboard): "Requires the SPEAK and
+  // USE_SOUNDBOARD permissions", and the bot "connected to the voice channel, having a voice state
+  // without deaf, self_deaf, mute, or suppress enabled". 204 (docs.discord.food), and "Fires a
+  // Voice Channel Effect Send Gateway event", under GUILD_VOICE_STATES (events/gateway). 50013
+  // without a permission is inferred; the answer when the bot isn't connected or is muted isn't
+  // documented, so that's a Gap. Discord's default sounds aren't modelled, so a sound the guild
+  // doesn't have is a Gap rather than 10097, and so is a sound from another guild. The bot hearing
+  // its own effect, and the effect's emoji coming from the sound, are inferred, not checked.
+  rest.route(
+    "POST",
+    "/channels/:channelId/send-soundboard-sound",
+    authed((req) => {
+      const channel = state.channels.get(req.params.channelId!);
+      if (!channel) return respond.unknownChannel();
+      if (
+        channel.type !== ChannelType.GuildVoice &&
+        channel.type !== ChannelType.GuildStageVoice
+      )
+        return rest.gap("a soundboard sound outside a voice channel");
+      const denied = mock.checkBotPerms(
+        channel,
+        Permission.Speak | Permission.UseSoundboard,
+      );
+      if (denied) return denied;
+      const guild = state.requireGuild(channel.guild_id!);
+      const voice = state.voiceStates.get(guild.id)?.get(state.bot.id);
+      if (voice?.channel_id !== channel.id)
+        return rest.gap("a soundboard sound from a bot not in the channel");
+      if (voice.deaf || voice.self_deaf || voice.mute || voice.suppress)
+        return rest.gap("a soundboard sound from a muted or deafened bot");
+      const body = (req.body ?? {}) as {
+        sound_id?: string;
+        source_guild_id?: string;
+      };
+      if (body.source_guild_id && body.source_guild_id !== guild.id)
+        return rest.gap("a soundboard sound from another guild");
+      const sound = guild.soundboardSounds.get(body.sound_id ?? "");
+      if (!sound)
+        return rest.gap("a default soundboard sound, or one the guild lacks");
+      gateway.dispatch(
+        GatewayDispatchEvents.VoiceChannelEffectSend,
+        {
+          channel_id: channel.id,
+          guild_id: guild.id,
+          user_id: state.bot.id,
+          emoji:
+            sound.emoji_id || sound.emoji_name
+              ? { id: sound.emoji_id, name: sound.emoji_name }
+              : null,
+          sound_id: sound.sound_id,
+          sound_volume: sound.volume,
+        },
+        GatewayIntentBits.GuildVoiceStates,
+      );
       return respond.noContent();
     }),
   );

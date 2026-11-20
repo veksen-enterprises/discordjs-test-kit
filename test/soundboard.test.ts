@@ -1,5 +1,10 @@
 import { once } from "node:events";
-import { Client, Events, GatewayIntentBits } from "discord.js";
+import {
+  Client,
+  Events,
+  GatewayIntentBits,
+  type VoiceChannel,
+} from "discord.js";
 import { afterEach, beforeEach, expect, it } from "vitest";
 import { createDiscordMock, type DiscordMock } from "../src/internal/mock.js";
 import { Permission } from "../src/internal/payloads.js";
@@ -141,4 +146,95 @@ it("sends the guild's sounds over the gateway when the bot asks for them", async
   // Assert
   expect(byGuild.get(guild.id)!.map((s) => s.name)).toEqual(["horn"]);
   mock.assertNoUnhandledRequests();
+});
+
+async function botInVoice(botPermissions: bigint) {
+  const record = mock.createGuild("g");
+  const lobby = mock.createVoiceChannel(record, "lobby");
+  mock.grantBot(Permission.ViewChannel | Permission.Connect | botPermissions);
+  client = new Client({
+    intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates],
+    ...mock.clientOptions,
+  });
+  const ready = once(client, Events.ClientReady);
+  await client.login(mock.token);
+  await ready;
+  const guild = client.guilds.cache.get(record.id)!;
+  const joined = once(client, Events.VoiceStateUpdate);
+  guild.shard.send({
+    op: 4,
+    d: {
+      guild_id: guild.id,
+      channel_id: lobby.id,
+      self_mute: false,
+      self_deaf: false,
+    },
+  });
+  await joined;
+  const sound = await guild.soundboardSounds.create({
+    ...SOUND,
+    name: "airhorn",
+    volume: 0.5,
+  });
+  return { channel: guild.channels.cache.get(lobby.id)!, sound };
+}
+
+it("plays a sound in the voice channel the bot is in, and hears the effect", async () => {
+  // Arrange
+  const { channel, sound } = await botInVoice(
+    Permission.CreateGuildExpressions |
+      Permission.Speak |
+      Permission.UseSoundboard,
+  );
+  const effect = once(client, Events.VoiceChannelEffectSend);
+
+  // Act
+  await (channel as VoiceChannel).sendSoundboardSound(sound);
+
+  // Assert
+  const [sent] = await effect;
+  expect([sent.channelId, sent.userId, sent.soundId, sent.soundVolume]).toEqual(
+    [channel.id, client.user!.id, sound.soundId, 0.5],
+  );
+});
+
+it("refuses to play a sound without Use Soundboard", async () => {
+  // Arrange
+  const { channel, sound } = await botInVoice(
+    Permission.CreateGuildExpressions | Permission.Speak,
+  );
+
+  // Act
+  const played = (channel as VoiceChannel).sendSoundboardSound(sound);
+
+  // Assert
+  await expect(played).rejects.toMatchObject({ code: 50013 });
+});
+
+it("records a sound played from outside the channel as unmodelled, since Discord's answer isn't documented", async () => {
+  // Arrange
+  const guild = await botWithSounds(
+    Permission.CreateGuildExpressions |
+      Permission.Speak |
+      Permission.UseSoundboard,
+  );
+  const lobby = mock.createVoiceChannel(
+    mock.state.requireGuild(guild.id),
+    "lobby",
+  );
+  const sound = await guild.soundboardSounds.create({
+    ...SOUND,
+    name: "airhorn",
+  });
+  const channel = (await guild.channels.fetch(lobby.id)) as VoiceChannel;
+
+  // Act
+  const played = channel.sendSoundboardSound(sound);
+
+  // Assert
+  await expect(played).rejects.toMatchObject({ code: 0 });
+  expect(mock.rest.unhandled).toEqual([
+    "a soundboard sound from a bot not in the channel",
+  ]);
+  mock.rest.unhandled.length = 0;
 });

@@ -1,12 +1,12 @@
 {
   "discordApiTypes": "0.38.59",
   "rest": {
-    "covered": 164,
+    "covered": 165,
     "botCallable": 213,
     "notBotCallable": 15
   },
   "gateway": {
-    "covered": 63,
+    "covered": 64,
     "total": 79
   },
   "restCovered": [
@@ -146,6 +146,7 @@
     "POST /channels/:/messages/:/threads",
     "POST /channels/:/messages/bulk-delete",
     "POST /channels/:/polls/:/expire",
+    "POST /channels/:/send-soundboard-sound",
     "POST /channels/:/threads",
     "POST /channels/:/typing",
     "POST /channels/:/webhooks",
@@ -236,6 +237,7 @@
     "THREAD_UPDATE",
     "TYPING_START",
     "USER_UPDATE",
+    "VOICE_CHANNEL_EFFECT_SEND",
     "VOICE_SERVER_UPDATE",
     "VOICE_STATE_UPDATE",
     "WEBHOOKS_UPDATE"
