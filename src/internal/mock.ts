@@ -2593,7 +2593,9 @@ export class DiscordMock {
     );
 
     // Discord's docs, resources/message#delete-message: another user's message in a guild
-    // channel needs MANAGE_MESSAGES. 204, fires MESSAGE_DELETE { id, channel_id, guild_id? }.
+    // channel needs MANAGE_MESSAGES. 204, fires MESSAGE_DELETE { id, channel_id, guild_id? }. In
+    // a DM the bot can delete only its own: another user's answers 50003 "Cannot execute action
+    // on a DM channel", as bulk delete does (Discord's code table; the pairing is inferred).
     rest.route(
       "DELETE",
       "/channels/:channelId/messages/:messageId",
@@ -2605,6 +2607,12 @@ export class DiscordMock {
         );
         if (!message) return respond.unknownMessage();
         const others = message.author.id !== state.bot.id;
+        if (others && !("guild_id" in channel && channel.guild_id))
+          return respond.error(
+            400,
+            50003,
+            "Cannot execute action on a DM channel",
+          );
         if (others) {
           const denied = this.checkBotPerms(channel, Permission.ManageMessages);
           if (denied) return denied;

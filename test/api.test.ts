@@ -97,6 +97,31 @@ it("lets a member DM the bot and finds the answer in their DMs", async () => {
   expect((await discord.waitForDM(alice, "pong")).content).toBe("pong");
 });
 
+it("refuses a bot deleting a member's message in their DMs", async () => {
+  // Arrange
+  const discord = await createDiscord();
+  const server = discord.guild("SIN");
+  const alice = discord.member(server, "alice");
+  const client = new Client({
+    intents: [GatewayIntentBits.DirectMessages],
+    partials: [Partials.Channel],
+    ...discord.clientOptions,
+  });
+  const refused = new Promise<unknown>((resolve) =>
+    client.on(Events.MessageCreate, (message) => {
+      if (!message.inGuild()) void message.delete().catch(resolve);
+    }),
+  );
+  await discord.start(client);
+
+  // Act
+  alice.dm({ content: "spam" });
+
+  // Assert
+  expect(await refused).toMatchObject({ code: 50003 });
+  expect(discord.dms(alice).map((m) => m.content)).toEqual(["spam"]);
+});
+
 it("lets the bot DM a member, and refuses with 50007 once they close their DMs", async () => {
   const { discord, generalChannel, alice } = await startBot();
 
