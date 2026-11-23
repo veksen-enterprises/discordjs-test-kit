@@ -91,9 +91,9 @@ it("clicks before the collector is up when quietTimeMs is shorter than the bot's
   await expect(click).rejects.toThrow("The application did not respond");
 });
 
-it("clicks without waiting out the default 100ms when quietTimeMs is 0", async () => {
-  // Arrange
-  const discord = await createDiscord({ quietTimeMs: 0 });
+/** How long 10 clicks on the panel take, with `quietTimeMs` as given. */
+async function tenClicks(options: DiscordOptions) {
+  const discord = await createDiscord(options);
   const server = discord.guild("SIN");
   const general = discord.textChannel(server, "general");
   const alice = discord.member(server, "alice");
@@ -101,16 +101,20 @@ it("clicks without waiting out the default 100ms when quietTimeMs is 0", async (
     commands: panelCommands,
   });
   const panel = await alice.runCommand(general, "panel");
-
-  // Act
   const started = performance.now();
   for (let i = 0; i < 10; i++) await alice.click(panel, "+1");
-  const elapsed = performance.now() - started;
+  return { elapsed: performance.now() - started, content: panel.content };
+}
 
-  // Assert
-  expect(panel.content).toBe("count 10");
-  expect(elapsed).toBeLessThan(10 * 100);
-});
+it("clicks without waiting out the default 100ms when quietTimeMs is 0", async () => {
+  // Act
+  const waiting = await tenClicks({});
+  const quick = await tenClicks({ quietTimeMs: 0 });
+
+  // Assert: the 100ms waits add a second to the 10 clicks, however loaded the machine is.
+  expect(quick.content).toBe("count 10");
+  expect(waiting.elapsed - quick.elapsed).toBeGreaterThan(500);
+}, 20_000);
 
 it("refuses a quietTimeMs that isn't a number of milliseconds, 0 or more", async () => {
   await expect(createDiscord({ quietTimeMs: -1 })).rejects.toThrow(
