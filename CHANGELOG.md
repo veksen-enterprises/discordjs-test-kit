@@ -1,28 +1,40 @@
 # Changelog
 
-## Unreleased
+## 0.6.0
 
-- New `member.unreact(message, emoji)`: a member takes back a reaction, and the bot hears `messageReactionRemove`, for reaction roles and giveaways.
-- Running a command now waits for the bot to go quiet first, as a click does, so work the bot left running after its last reply has finished. The quiet wait counts from the bot's last activity, so it no longer adds 100ms when the bot was already quiet.
-- `discord.member(server, name, { bot: true, addedBy })` logs a BOT_ADD audit entry by `addedBy` (the owner by default), and renaming the server logs GUILD_UPDATE with the old and new name.
-- A reply to a message that isn't in the channel is refused with Invalid Form Body (50035), naming `message_reference`, as Discord does; it used to fail the test as unsupported. Channel names lose the spaces around them, as on Discord.
-- Fixed: about one voice connection in 200 failed with an unmodelled "PEM routines::ASN1 lib" error, because the fake voice server's certificate sometimes had an invalid serial number.
-- Running a command waits up to 2 seconds for a bot that hasn't registered any commands yet, so a bot that deploys its commands while it starts doesn't fail the first command. With commands already registered, a wrong name still fails at once.
-- `discord.start(client)` works with a bot that logs itself in (on import, or in its framework's setup) using `discord.token`: it waits for the bot instead of logging in again. A bot that logged in with another token gets a clear error.
-- `discord.member(server, name, { roles })` gives the member roles made with `discord.role(server, name)`, for a bot that checks a member's roles by name.
-- The bot hears `guildMemberUpdate` for its own nickname change without the Guild Members intent, as on Discord. Uploading a soundboard sound answers 201, and an emoji upload's answer leaves out `user`, as Discord's do.
-- Typing where the bot can't send messages is refused with Missing Access (50001), and an invite lasting over 7 days with Invalid Form Body (50035), as the test guild answered. Both used to fail the test as unsupported.
+Most of this release makes the kit answer the way Discord does, checked against a real Discord server.
+
+### May fail tests that passed
+
+These bots work in the kit but not on Discord, so their tests now fail:
+
+- Setting a channel overwrite that allows or denies a permission the bot doesn't hold is refused with Missing Permissions (50013). It used to succeed.
+- A bot deleting a member's message in their DMs is refused (50003). It used to succeed.
+- Without the Message Content intent turned on for your app (see `privilegedIntents` below), messages the bot fetches arrive without their text, as gateway events already did.
+- Listing who reacted without Read Message History, and listing archived private threads without Manage Threads, are refused with Missing Access (50001), not 50013.
+
+### Added
+
+- New `createDiscord({ privilegedIntents })`: the privileged intents your app has turned on in the Developer Portal (all three by default).
 - New `discord.waitForTextChannel(server, name)`: a handle for a text channel the bot creates, such as a ticket channel, so a test can post in it and read what the bot sends there.
-- Polls: the bot can edit a poll message's text and remove its buttons; the poll stays, as on Discord. It used to fail the test as unsupported.
-- New `createDiscord({ privilegedIntents })`: the privileged intents your app has turned on in the Developer Portal (all three by default). Without Message Content, messages the bot fetches arrive without their text too, as on Discord; before, only gateway events lost it.
-- Bans: `members.ban(user, { deleteMessageSeconds })` works, and removes the member's messages from that window. It used to fail the test as unsupported.
-- A bot deleting a member's message in their DMs is refused (50003), as Discord refuses it; it used to succeed.
-- The wait before a click or pick, and the other waits for the bot to go quiet, count only time the test process could run. On a loaded machine (a busy CI runner, several suites at once), a pause the OS imposes no longer makes the kit click before the bot listens. Discord's 3-second interaction deadline stays real time.
-- Setting a channel overwrite that allows or denies a permission the bot doesn't hold is refused with Missing Permissions (50013), as Discord does. It used to succeed, so a bot that does this passed its tests and failed on Discord.
-- Listing who reacted without Read Message History is refused with Missing Access (50001), as Discord does, instead of 50013.
-- Listing archived private threads without Manage Threads is refused with Missing Access (50001), as Discord does, instead of Missing Permissions (50013).
-- Roles carry `description`, guild previews `home_header`, and scheduled events `sku_ids` and `guild_scheduled_event_exceptions`, as Discord sends them.
-- `GUILD_CREATE`'s roles no longer carry `description`, and creating a scheduled event no longer answers with a `creator` object: Discord sends neither.
+- `discord.member(server, name, { roles })` gives the member roles made with `discord.role(server, name)`, for a bot that checks roles by name. `{ bot: true, addedBy }` logs who added another bot (the owner by default).
+- New `member.unreact(message, emoji)`: a member takes back a reaction, and the bot hears `messageReactionRemove`.
+- `discord.start(client)` works with a bot that logs itself in (on import, or in its framework's setup) using `discord.token`.
+- Bans: `members.ban(user, { deleteMessageSeconds })` works and removes the member's messages from that window.
+- Polls: the bot can edit a poll message's text and remove its buttons; the poll stays.
+- Typing where the bot can't send messages (50001), an invite lasting over 7 days (50035) and a reply to a message that isn't in the channel (50035) answer as Discord does, instead of failing the test as unsupported.
+- The audit log records renaming the server and adding a bot.
+
+### Changed
+
+- Running a command waits for the bot to go quiet first, as a click does, so work the bot left running after its last reply has finished. While the bot has registered no commands yet, it waits up to 2 seconds for them.
+- The wait for the bot to go quiet counts only time the test could run, so a busy machine no longer makes the kit click before the bot listens, and it counts from the bot's last activity, so a bot already quiet isn't kept waiting. Discord's 3-second deadline to answer an interaction stays real time.
+- Channel names lose the spaces around them. Uploading an emoji or a soundboard sound answers 201. The bot hears `guildMemberUpdate` for its own nickname change without the Guild Members intent.
+- Roles carry `description`, guild previews `home_header`, and scheduled events `sku_ids` and `guild_scheduled_event_exceptions`. `GUILD_CREATE`'s roles, a member update's `deaf` and `mute`, an emoji upload's `user` and a created event's `creator` are left out, as Discord leaves them out.
+
+### Fixed
+
+- About one voice connection in 200 failed with "PEM routines::ASN1 lib", because the kit's voice server certificate sometimes had an invalid serial number.
 
 ## 0.5.0
 
