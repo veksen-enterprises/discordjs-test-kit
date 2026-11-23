@@ -135,6 +135,27 @@ it("refuses a bulk delete with a message over two weeks old, or too few ids", as
   ).toBe(50035);
 });
 
+it("refuses to list who reacted without Read Message History, with Missing Access", async () => {
+  // Arrange
+  const { general, channel, alice } = await start(
+    Permission.ReadMessageHistory,
+  );
+  const posted = mock.as(alice).sendMessage(general, "poll");
+  mock.as(alice).react(posted, "👍");
+  const message = await channel.messages.fetch(posted.id);
+  mock.setOverwrite(
+    general,
+    { id: mock.state.bot.id, type: 1 },
+    { deny: Permission.ReadMessageHistory },
+  );
+
+  // Act
+  const users = message.reactions.resolve("👍")!.users.fetch();
+
+  // Assert
+  await expect(users).rejects.toMatchObject({ code: 50001 });
+});
+
 it("removes another user's reaction, an emoji's, then all, lists who reacted, and announces each", async () => {
   const { general, channel, alice, bob } = await start(
     Permission.ManageMessages | Permission.ReadMessageHistory,

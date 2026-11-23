@@ -229,11 +229,14 @@ export function registerMessageRoutes(
   };
 
   // Get Reactions: users who reacted with `emoji`, ordered by id for `after`, 25 by default.
-  // Needs READ_MESSAGE_HISTORY like reading the message (inferred, not checked).
+  // Without READ_MESSAGE_HISTORY, 50001 Missing Access (checked by the contract run).
   rest.route(
     "GET",
     "/channels/:channelId/messages/:messageId/reactions/:emoji",
     authed((req) => {
+      const channel = state.channels.get(req.params.channelId!);
+      if (channel && mock.checkBotPerms(channel, Permission.ReadMessageHistory))
+        return respond.missingAccess();
       const { refused, message } = target(req, Permission.ReadMessageHistory);
       if (refused) return refused;
       const after = BigInt(req.query.get("after") ?? 0);
