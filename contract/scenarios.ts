@@ -8,6 +8,9 @@ export interface Observation {
 const SEND_MESSAGES = 1n << 11n;
 const READ_MESSAGE_HISTORY = 1n << 16n;
 const MANAGE_GUILD = 1n << 5n;
+/** 0.3 seconds of 440 Hz, Ogg Opus (ffmpeg -f lavfi -i sine=frequency=440:duration=0.3 -c:a libopus). */
+const CONTRACT_SOUND =
+  "T2dnUwACAAAAAAAAAAB1NCDHAAAAAKk6WkYBE09wdXNIZWFkAQE4AYC7AAAAAABPZ2dTAAAAAAAAAAAAAHU0IMcBAAAAI0qA4QE8T3B1c1RhZ3MMAAAATGF2ZjYzLjEuMTAyAQAAABwAAABlbmNvZGVyPUxhdmM2My4xLjEwMiBsaWJvcHVzT2dnUwAEeDkAAAAAAAB1NCDHAgAAAN0gujwQRTEsNzQ5LTI4MSwrMi4tGXiCAbdsfkDmAAAKvpqnvv+2hdcKceDda6DjxsXDMsZkHm5jUjpFDIpTj0QYsIxkq+yYlnlsVFMwVU6C5BbKWUnYxwldWXijP/esmIUDV0wlJ/WKw/WMdoevflpzXcfZ1s5DLQlJr2/POrQt+pViWY6ZIm/p7sN4m6MSUUUArNFV/6eRtPYcGJOKCT1PUU1wVpwEDuchPEkJ0n+JP8X8ocV+A3iboxG0HL+omxd8PsanS1kLdd2vT/Jw1SshsLXNMVag2dks7MR66Y3hHjevaYJ6r6R62qihX5Z4m6NfdZz8RdC0OAWcMxKhAbuEHU2z0ObjvosK82FS/jwKKgrJUOHKvDNQh42bz4rPBuL6eJujElOqRLrnpWWA9gdofhXZDzZZltPqqFzFclr1m3VfDAFtGLdGd6UmyovQMVFRuXLGN3kvQoVjeJujX3Wc/ElKIurCxscx5W+cdD1PCbIz63XEb8lJbT3RKfY138M79JGrDt6GeJujElbOI4h0kOQDb84xR2I9c+A3IgbpNSuJZYvT/YSVsThU1PvDIaEPRCdYfdOK/AZ4m6MRtBy/UlD/lDsbAOAkdr4YkiPAqSc2T+Cjkwj1/gmPRlcIBUEtsP5y9Goq4DMtu0N3BYUNi0ibKx91nPxFnnKRI2qUE6UNSymEaECWdnRhxDGtg4AviDrno+lRafTtNhrtYSNqGOhImyrSU6pEuBwG1e7q1NCm84ewhVjmjUtOW91FgNQ3HqhUX1uQqyz9YQf0kkibKx91nPxF70zhx2OetF0/Tq0WDWWhsJ+gw5JdS0X+4svTEloekNEuy+BImyrSU6pITqC1WAN4/dtG+Vq3ssoDzE1tq6wvJRw2HvTdJujCPTEmigy/+IZLw94qQEibKtG0HL9SKIDRXa0RNldzBJqDQtetG8DehVU3VTdPL0rkdgFWBPvIOLN8EFBImysfdZz8RdCz5Xl8SURzaJmJkVNg5vwHb9Galp4g31vj2ZEnT9mba/HjaEhIBdFHOi7/7MbdgOxVdrfB7UGDPZjobFdA";
 const MANAGE_CHANNELS = 1n << 4n;
 
 /**
@@ -308,22 +311,44 @@ export async function runScenarios(
       ],
     });
     const guild = `/guilds/${target.guildId}`;
+    // A run that stopped halfway leaves its emoji and sound behind: remove them first.
+    for (const emoji of ((await call("GET", `${guild}/emojis`)).body ?? []) as {
+      id: string;
+      name: string;
+    }[])
+      if (emoji.name === "contract")
+        await call("DELETE", `${guild}/emojis/${emoji.id}`);
+    const leftover = (await call("GET", `${guild}/soundboard-sounds`)).body as {
+      items?: { sound_id: string; name: string }[];
+    } | null;
+    for (const sound of leftover?.items ?? [])
+      if (sound.name === "contract")
+        await call("DELETE", `${guild}/soundboard-sounds/${sound.sound_id}`);
     out.createChannelNameTooLong = await call("POST", `${guild}/channels`, {
       name: "x".repeat(101),
       type: 0,
     });
-    // The invite has no Create Expressions.
-    out.createEmojiWithoutPermission = await call("POST", `${guild}/emojis`, {
+    // The test guild's @everyone grants Create Expressions.
+    out.createEmoji = await call("POST", `${guild}/emojis`, {
       name: "contract",
       image:
         "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
     });
-    out.createSoundWithoutPermission = await call(
-      "POST",
-      `${guild}/soundboard-sounds`,
-      { name: "contract", sound: "data:audio/ogg;base64,T2dnUw==" },
-    );
-    // Change Nickname: whether the test guild's @everyone grants it is what this checks.
+    const emojiId = (out.createEmoji.body as { id?: string })?.id;
+    if (emojiId)
+      out.deleteEmoji = await call("DELETE", `${guild}/emojis/${emojiId}`);
+    // 0.3s of Ogg Opus: Discord refuses a file it can't read with 50110.
+    out.createSound = await call("POST", `${guild}/soundboard-sounds`, {
+      name: "contract",
+      sound: `data:audio/ogg;base64,${CONTRACT_SOUND}`,
+    });
+    const soundId = (out.createSound.body as { sound_id?: string })?.sound_id;
+    if (soundId)
+      out.deleteSound = await call(
+        "DELETE",
+        `${guild}/soundboard-sounds/${soundId}`,
+      );
+    // The test guild's @everyone grants Change Nickname.
     out.setOwnNickname = await call("PATCH", `${guild}/members/@me`, {
       nick: "contract",
     });
@@ -355,16 +380,10 @@ export async function runScenarios(
       out.listGuildInvites = await call("GET", `${guild}/invites`);
       out.deleteInvite = await call("DELETE", `/invites/${code}`);
     }
-    if (target.name === "discord") {
-      out.discoverInviteOver7Days = await call(
-        "POST",
-        `/channels/${channelId}/invites`,
-        { max_age: 604_801, unique: true },
-      );
-      const long = (out.discoverInviteOver7Days.body as { code?: string })
-        ?.code;
-      if (long) await call("DELETE", `/invites/${long}`);
-    }
+    out.inviteOver7Days = await call("POST", `/channels/${channelId}/invites`, {
+      max_age: 604_801,
+      unique: true,
+    });
     out.unknownInvite = await call("GET", "/invites/contractnope");
     out.botVoiceState = await call("GET", `${guild}/voice-states/@me`);
     out.listScheduledEvents = await call("GET", `${guild}/scheduled-events`);
@@ -453,12 +472,7 @@ export async function runScenarios(
       `/channels/${channelId}/messages`,
       { content: "should be refused" },
     );
-    // Discovery, Discord only: the kit leaves these unmodelled.
-    if (target.name === "discord")
-      out.discoverTypingWithoutSend = await call(
-        "POST",
-        `/channels/${channelId}/typing`,
-      );
+    out.typingWithoutSend = await call("POST", `/channels/${channelId}/typing`);
     out.deleteOverwrite = await call(
       "DELETE",
       `/channels/${channelId}/permissions/${target.botId}`,

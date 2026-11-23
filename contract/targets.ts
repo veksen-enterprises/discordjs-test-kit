@@ -1,7 +1,6 @@
 import { once } from "node:events";
 import { Client, Events, GatewayIntentBits } from "discord.js";
 import { createDiscordMock } from "../src/internal/mock.js";
-import { Permission } from "../src/internal/payloads.js";
 
 /** What a scenario needs from either side: raw REST, a guild to work in, and the gateway traffic. */
 export interface Target {
@@ -14,6 +13,9 @@ export interface Target {
   dispatches: { t: string; d: unknown }[];
   close(): Promise<void>;
 }
+
+/** The test guild's @everyone permissions (listRoles, run 45112207562). */
+const TEST_GUILD_EVERYONE = "2248473465835073";
 
 /** The permissions the test bot was invited with; the mock bot gets the same through a role. */
 export const INVITE_PERMISSIONS = 268561488n;
@@ -64,19 +66,10 @@ export async function mockTarget(): Promise<Target> {
   const guild = mock.createGuild("contract");
   mock.createTextChannel(guild, "general");
   mock.createRole(guild, "contract-bot", INVITE_PERMISSIONS, [mock.state.bot]);
-  // The test guild's @everyone lets the bot start public threads: run 7 got 201 for a thread the
-  // invite doesn't grant. The mock's @everyone is narrower, so the bot gets it here.
-  // Create Invite and Send Polls are in a new server's @everyone too (inferred; the contract's
-  // createInvite and sendPoll check them). So is Create Events: run 45099526148 created an event.
-  mock.createRole(
-    guild,
-    "everyone-extras",
-    Permission.CreatePublicThreads |
-      Permission.CreateInstantInvite |
-      Permission.SendPolls |
-      Permission.CreateEvents,
-    [mock.state.bot],
-  );
+  // The test guild's @everyone, read from run 45112207562's listRoles: much wider than the
+  // kit's least-privilege World (Create Events, Create Expressions, Change Nickname, threads,
+  // polls, ...), so the contract world copies it exactly.
+  guild.roles.get(guild.id)!.permissions = TEST_GUILD_EVERYONE;
   const dispatches: Target["dispatches"] = [];
   const client = await connect(mock.token, mock.apiUrl, dispatches);
   return {
