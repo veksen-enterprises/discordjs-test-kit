@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- `discord.member(server, name, { roles })` gives the member roles made with `discord.role(server, name)`, for a bot that checks a member's roles by name.
 - The bot hears `guildMemberUpdate` for its own nickname change without the Guild Members intent, as on Discord. Uploading a soundboard sound answers 201, and an emoji upload's answer leaves out `user`, as Discord's do.
 - Typing where the bot can't send messages is refused with Missing Access (50001), and an invite lasting over 7 days with Invalid Form Body (50035), as the test guild answered. Both used to fail the test as unsupported.
 - New `discord.waitForTextChannel(server, name)`: a handle for a text channel the bot creates, such as a ticket channel, so a test can post in it and read what the bot sends there.

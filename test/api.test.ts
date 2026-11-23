@@ -97,6 +97,45 @@ it("lets a member DM the bot and finds the answer in their DMs", async () => {
   expect((await discord.waitForDM(alice, "pong")).content).toBe("pong");
 });
 
+async function startRoleCheckBot() {
+  const discord = await createDiscord();
+  const server = discord.guild("SIN");
+  const general = discord.textChannel(server, "general");
+  const moderator = discord.role(server, "moderator");
+  const client = new Client({
+    intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers],
+    ...discord.clientOptions,
+  });
+  client.on(Events.InteractionCreate, async (interaction) => {
+    if (!interaction.isChatInputCommand() || !interaction.inCachedGuild())
+      return;
+    const member = await interaction.guild.members.fetch(interaction.user.id);
+    const staff = member.roles.cache.some((r) => r.name === "moderator");
+    await interaction.reply(staff ? "locked" : "moderators only");
+  });
+  await discord.start(client, {
+    commands: [{ name: "lock", description: "Lock the channel" }],
+  });
+  return { discord, server, general, moderator };
+}
+
+it("gives a member a role by name, which the bot sees", async () => {
+  // Arrange
+  const { discord, server, general, moderator } = await startRoleCheckBot();
+  const mod = discord.member(server, "Mod", { roles: [moderator] });
+  const alice = discord.member(server, "alice");
+
+  // Act
+  const modReply = await mod.runCommand(general, "lock");
+  const aliceReply = await alice.runCommand(general, "lock");
+
+  // Assert
+  expect([modReply.content, aliceReply.content]).toEqual([
+    "locked",
+    "moderators only",
+  ]);
+});
+
 async function startTicketBot() {
   const discord = await createDiscord();
   const server = discord.guild("SIN");

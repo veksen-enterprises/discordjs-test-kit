@@ -733,15 +733,18 @@ export class DiscordMock {
       { guild_id: guild.id, role },
       GatewayIntentBits.Guilds,
     );
-    for (const user of members) {
-      this.state.assignRole(guild.id, user.id, role.id);
-      this.gateway.dispatch(
-        GatewayDispatchEvents.GuildMemberUpdate,
-        { ...guild.members.get(user.id)!, guild_id: guild.id },
-        GatewayIntentBits.GuildMembers,
-      );
-    }
+    for (const user of members) this.giveRole(guild, user, role.id);
     return role;
+  }
+
+  /** `user` gets the role: a bot already connected hears GUILD_MEMBER_UPDATE (GUILD_MEMBERS). */
+  giveRole(guild: GuildRecord, user: APIUser, roleId: string) {
+    this.state.assignRole(guild.id, user.id, roleId);
+    this.gateway.dispatch(
+      GatewayDispatchEvents.GuildMemberUpdate,
+      { ...guild.members.get(user.id)!, guild_id: guild.id },
+      GatewayIntentBits.GuildMembers,
+    );
   }
 
   /** What the bot's invite link grants, by every grantBot so far: guilds built later get it too. */

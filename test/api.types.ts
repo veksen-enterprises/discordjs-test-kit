@@ -95,3 +95,7 @@ void createDiscord({ privilegedIntents: [GatewayIntentBits.Guilds] });
 const ticket = await discord.waitForTextChannel(otherServer, "ticket");
 // @ts-expect-error
 void alice.post(ticket, { content: "hi" });
+
+// A role from another server
+// @ts-expect-error
+discord.member(server, "dave", { roles: [discord.role(otherServer, "mod")] });
