@@ -1,6 +1,6 @@
 {
   "name": "discordjs-test-kit",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "A fake Discord (REST + Gateway) that discord.js bots connect to in tests",
   "keywords": [
     "discord",

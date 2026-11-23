@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.1
+
+### Fixed
+
+- `discord.start(client)` refused a bot whose client picked up a `DISCORD_TOKEN` environment variable without logging in, saying it "logged in with a token that isn't discord.token". It logs that bot in again, as before 0.6.0.
+
 ## 0.6.0
 
 Most of this release makes the kit answer the way Discord does, checked against a real Discord server.
