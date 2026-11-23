@@ -10,8 +10,8 @@ import {
 } from "discord-api-types/v10";
 import type { Client } from "discord.js";
 import { onTestFinished } from "vitest";
-import { hookCollectors, skip } from "./internal/clock.js";
 import { recordAudit } from "./internal/audit.js";
+import { hookCollectors, skip } from "./internal/clock.js";
 import { setCommandPermissions } from "./internal/command-permissions.js";
 import {
   deleteExpression,
@@ -1037,6 +1037,7 @@ class MemberActor {
     form?: Form,
   ): Promise<Message> {
     await this.untilCommandsRegistered(channel);
+    await this.botSettled();
     const values = optionIds(options);
     return this.answer(
       this.actor().slashCommand(
@@ -1074,6 +1075,7 @@ class MemberActor {
     form?: Form,
   ): Promise<Message> {
     await this.untilCommandsRegistered(channel);
+    await this.botSettled();
     const state = this.mock.state;
     return this.answer(
       this.actor().contextMenu(
@@ -1092,6 +1094,7 @@ class MemberActor {
     form?: Form,
   ): Promise<Message> {
     await this.untilCommandsRegistered(channel);
+    await this.botSettled();
     const state = this.mock.state;
     return this.answer(
       this.actor().contextMenu(
@@ -1135,9 +1138,10 @@ class MemberActor {
   }
 
   /**
-   * A member reads a message before using its components, so the bot has finished what it does
-   * after sending it, such as fetching the reply and starting a component collector on it. A bot
-   * still busy after the idle wait gets the click anyway, as a member wouldn't wait forever.
+   * A member reads a message before using its components, and types a command after reading the
+   * last answer, so the bot has finished what it does after sending it, such as starting a component
+   * collector or saving what the command started. A bot still busy after the idle wait gets the
+   * action anyway, as a member wouldn't wait forever.
    */
   private async botSettled() {
     await this.mock.waitForIdle({ quietMs: this.quietTimeMs }).catch(() => {});
@@ -1480,7 +1484,8 @@ function handle<T>(id: string, name: string): T {
 export interface DiscordOptions {
   /**
    * How long, in milliseconds, the bot must stay quiet (no request to Discord open, nothing new sent
-   * to it) before a member clicks a button or picks from a select. Default: 100.
+   * to it) before a member runs a command, clicks a button or picks from a select. It counts from
+   * the bot's last activity, so a bot already quiet that long isn't kept waiting. Default: 100.
    *
    * A member reads a message before using it, so the bot has time to finish what it does after
    * replying, such as fetching its reply and starting a component collector on it. The kit can't see

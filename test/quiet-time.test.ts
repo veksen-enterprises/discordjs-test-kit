@@ -127,3 +127,36 @@ it("refuses a quietTimeMs that isn't a number of milliseconds, 0 or more", async
     createDiscord({ quietTimeMs: Number.POSITIVE_INFINITY }),
   ).rejects.toThrow("not Infinity");
 });
+
+it("runs a command once the bot has finished the work it left running after its last reply", async () => {
+  // Arrange: /start replies, then saves the giveaway 50ms later, unawaited, as a giveaway bot does.
+  const discord = await createDiscord();
+  const server = discord.guild("SIN");
+  const general = discord.textChannel(server, "general");
+  const alice = discord.member(server, "alice");
+  const client = new Client({
+    intents: [GatewayIntentBits.Guilds],
+    ...discord.clientOptions,
+  });
+  let saved = false;
+  client.on(Events.InteractionCreate, async (interaction) => {
+    if (!interaction.isChatInputCommand()) return;
+    if (interaction.commandName === "start") {
+      await interaction.reply("Giveaway started");
+      void sleep(50).then(() => (saved = true));
+    } else await interaction.reply(saved ? "rerolled" : "no giveaway");
+  });
+  await discord.start(client, {
+    commands: [
+      { name: "start", description: "Start a giveaway" },
+      { name: "reroll", description: "Reroll it" },
+    ],
+  });
+  await alice.runCommand(general, "start");
+
+  // Act
+  const reply = await alice.runCommand(general, "reroll");
+
+  // Assert
+  expect(reply.content).toBe("rerolled");
+});

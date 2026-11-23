@@ -344,6 +344,8 @@ export class DiscordMock {
   /** REST requests the bot has open. With `activity`, tells when the bot has gone quiet. */
   private inFlight = 0;
   readonly activity = new EventEmitter<{ change: [] }>();
+  /** When the bot last sent a request, got an answer or was sent a dispatch, in runnable time. */
+  private lastActivityAt = runnable.now();
   readonly interactionDeadlineMs: number;
   readonly privilegedIntents: number;
   apiUrl = "";
@@ -358,6 +360,9 @@ export class DiscordMock {
       GatewayIntentBits.GuildMembers |
         GatewayIntentBits.GuildPresences |
         GatewayIntentBits.MessageContent;
+    this.activity.on("change", () => {
+      this.lastActivityAt = runnable.now();
+    });
     this.gateway = new Gateway(this.state, {
       token: this.token,
       privilegedIntents: this.privilegedIntents,
@@ -881,15 +886,18 @@ export class DiscordMock {
         }
         realSetImmediate(() => confirm(turns - 1, started));
       };
+      // The quiet spell counts from the bot's last activity: a bot already quiet that long needs
+      // no further wait.
       const restart = () => {
         generation++;
         runnable.clearTimeout(quiet);
         const started = generation;
+        const quietFor = runnable.now() - this.lastActivityAt;
         quiet =
           this.inFlight === 0
             ? runnable.setTimeout(
                 () => confirm(QUIET_CONFIRM_TURNS, started),
-                quietMs,
+                Math.max(0, quietMs - quietFor),
               )
             : undefined;
       };
