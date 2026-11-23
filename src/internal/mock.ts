@@ -2397,8 +2397,10 @@ export class DiscordMock {
       }),
     );
 
-    // Needs MANAGE_ROLES on the channel. Inferred, not checked: Discord also refuses to
-    // allow a permission the bot doesn't have itself; the mock doesn't enforce that yet.
+    // resources/channel#edit-channel-permissions: needs MANAGE_ROLES on the channel, and "only
+    // permissions your bot has in the guild or parent channel (if applicable) can be
+    // allowed/denied (unless your bot has a MANAGE_ROLES overwrite in the channel)". The contract
+    // run got 50013 for an overwrite allowing Manage Server, which the bot doesn't hold.
     rest.route(
       "PUT",
       "/channels/:channelId/permissions/:overwriteId",
@@ -2410,6 +2412,12 @@ export class DiscordMock {
         const body = req.body as
           | RESTPutAPIChannelPermissionJSONBody
           | undefined;
+        const requested = BigInt(body?.allow ?? 0) | BigInt(body?.deny ?? 0);
+        if (
+          requested & ~this.permissionsToGrant(channel) &&
+          !this.hasManageRolesOverwrite(channel)
+        )
+          return respond.missingPermissions();
         this.setOverwrite(
           channel,
           { id: req.params.overwriteId!, type: body?.type ?? 0 },
@@ -3124,6 +3132,33 @@ export class DiscordMock {
   }
 
   /** VIEW_CHANNEL first: without it "other channel permissions are effectively ignored" (docs.discord.food/topics/permissions). */
+  /** What the bot holds in the guild, or in the channel's category when it has one. */
+  private permissionsToGrant(channel: APIChannel): bigint {
+    const guild = this.state.requireGuild(
+      (channel as { guild_id: string }).guild_id,
+    );
+    const parentId = "parent_id" in channel ? channel.parent_id : null;
+    const parent = parentId ? this.state.channels.get(parentId) : undefined;
+    return computePermissions(this.state, guild, this.state.bot.id, parent);
+  }
+
+  /** Whether an overwrite in `channel`, for the bot or one of its roles, allows Manage Roles. */
+  private hasManageRolesOverwrite(channel: APIChannel): boolean {
+    const guild = this.state.requireGuild(
+      (channel as { guild_id: string }).guild_id,
+    );
+    const roles = guild.members.get(this.state.bot.id)?.roles ?? [];
+    const overwrites =
+      "permission_overwrites" in channel
+        ? (channel.permission_overwrites ?? [])
+        : [];
+    return overwrites.some(
+      (o) =>
+        (o.id === this.state.bot.id || roles.includes(o.id)) &&
+        (BigInt(o.allow) & Permission.ManageRoles) !== 0n,
+    );
+  }
+
   checkBotPerms(channel: APIChannel, needed: bigint) {
     if (!("guild_id" in channel) || !channel.guild_id) return undefined;
     const guild = this.state.requireGuild(channel.guild_id);

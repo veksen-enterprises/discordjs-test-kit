@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Setting a channel overwrite that allows or denies a permission the bot doesn't hold is refused with Missing Permissions (50013), as Discord does. It used to succeed, so a bot that does this passed its tests and failed on Discord.
 - Listing archived private threads without Manage Threads is refused with Missing Access (50001), as Discord does, instead of Missing Permissions (50013).
 - Roles carry `description`, guild previews `home_header`, and scheduled events `sku_ids` and `guild_scheduled_event_exceptions`, as Discord sends them.
 - `GUILD_CREATE`'s roles no longer carry `description`, and creating a scheduled event no longer answers with a `creator` object: Discord sends neither.

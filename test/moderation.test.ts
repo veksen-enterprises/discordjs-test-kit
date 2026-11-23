@@ -271,6 +271,58 @@ it("moves a channel into a category and syncs its overwrites, but not past the b
   ).toBe(50013);
 });
 
+it("refuses an overwrite allowing a permission the bot doesn't hold", async () => {
+  // Arrange
+  const { guild, record, alice } = await start(
+    Permission.ManageChannels | Permission.ManageRoles,
+  );
+  const channel = await guild.channels.fetch(
+    mock.createTextChannel(record, "mods").id,
+  );
+  if (channel?.type !== ChannelType.GuildText) throw new Error("text");
+
+  // Act
+  const edited = channel.permissionOverwrites.edit(
+    alice.id,
+    { BanMembers: true },
+    { type: OverwriteType.Member },
+  );
+
+  // Assert
+  expect((await refusal(edited)).code).toBe(50013);
+});
+
+it("lets an overwrite grant what the bot doesn't hold once the bot has Manage Roles in that channel", async () => {
+  // Arrange
+  const { guild, record, alice } = await start(
+    Permission.ManageChannels | Permission.ManageRoles,
+  );
+  const mods = mock.createTextChannel(record, "mods");
+  mock.setOverwrite(
+    mods,
+    { id: mock.state.bot.id, type: 1 },
+    { allow: Permission.ManageRoles },
+  );
+  const channel = await guild.channels.fetch(mods.id);
+  if (channel?.type !== ChannelType.GuildText) throw new Error("text");
+
+  // Act
+  await channel.permissionOverwrites.edit(
+    alice.id,
+    { BanMembers: true },
+    { type: OverwriteType.Member },
+  );
+
+  // Assert
+  const stored = mock.state.requireChannel(mods.id) as APITextChannel;
+  expect(stored.permission_overwrites?.find((o) => o.id === alice.id)).toEqual({
+    id: alice.id,
+    type: 1,
+    allow: String(Permission.BanMembers),
+    deny: "0",
+  });
+});
+
 it("lists the guild's bans", async () => {
   // Arrange
   const { guild, alice } = await start(Permission.BanMembers);
