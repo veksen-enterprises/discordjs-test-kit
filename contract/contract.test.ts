@@ -98,7 +98,7 @@ describe("scenarios against the mock", () => {
       sendPollWithoutAnswers: 400,
       listReactionsWithoutHistory: 403,
       bulkDeleteDuplicate: 400,
-      overwriteGrantingUnheld: 204,
+      overwriteGrantingUnheld: 403,
       listEmojis: 200,
       sendTyping: 204,
       sendPoll: 200,

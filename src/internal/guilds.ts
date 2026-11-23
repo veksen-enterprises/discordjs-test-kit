@@ -93,8 +93,8 @@ export function registerGuildRoutes(
   );
 
   // Get Guild Widget Settings and Modify Guild Widget (docs.discord.food/resources/guild), both
-  // with Manage Server. 50013 without it is inferred, not checked. A channel that isn't one of the
-  // guild's has no documented code: a Gap. The 30042 limit on changes isn't modelled.
+  // with Manage Server; the contract run checks the 50013 without it nightly. A channel that isn't
+  // one of the guild's has no documented code: a Gap. The 30042 limit on changes isn't modelled.
   const widgetGuild = (guildId: string) => {
     const guild = state.guilds.get(guildId);
     if (!guild) return { refused: unknownGuild() };
@@ -177,9 +177,9 @@ export function registerGuildRoutes(
 
   // Get Guild Widget (discord-api-docs resources/guild, docs.discord.food/resources/guild): the
   // public widget, no permission. "The guild must have the widget enabled": 50004 is discord-api-
-  // types' GuildWidgetDisabled; the 403 is inferred, not checked. With an invite channel set,
-  // Discord makes an invite on the first fetch, but neither page says whose it is or when it
-  // expires, so that's a Gap. Channels: "voice and stage channels which are accessible by
+  // types' GuildWidgetDisabled, and the contract run checks its 403 nightly. With an invite
+  // channel set, Discord makes an invite on the first fetch, but neither page says whose it is or
+  // when it expires, so that's a Gap. Channels: "voice and stage channels which are accessible by
   // @everyone", read as View Channel and Connect (inferred). Members: up to 100 non-offline ones,
   // with `id`, `discriminator` and `avatar` "anonymized": the docs' examples count ids up from "0"
   // with discriminator "0000" and avatar null. The username shown, the member order, and the voice

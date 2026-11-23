@@ -75,6 +75,7 @@
   "gateway.READY.user_settings: missing in mock (Discord: object)",
   "gateway.THREAD_MEMBER_UPDATE.mute_config: missing in mock (Discord: null)",
   "gateway.THREAD_MEMBER_UPDATE.muted: missing in mock (Discord: boolean)",
+  "rest.bulkDeleteDuplicate.errors: missing in mock (Discord: object)",
   "rest.bulkDeleteTooFew.errors: missing in mock (Discord: object)",
   "rest.createInvite.guild.nsfw: missing in mock (Discord: boolean)",
   "rest.createInvite.guild.premium_tier: missing in mock (Discord: number)",

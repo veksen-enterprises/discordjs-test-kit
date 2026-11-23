@@ -9,9 +9,10 @@ import type { DiscordState, GuildRecord, TemplateRecord } from "./state.js";
 // name 1-100, description up to 120; Delete answers the deleted template), discord-api-types'
 // APITemplateSerializedSourceGuild (the snapshot has Create Guild's body shape, so roles and
 // channels carry placeholder ids) and its error codes 10057 UnknownGuildTemplate and 30031
-// GuildAlreadyHasTemplate. Inferred, not checked: the code format, 50035 for a bad name or
-// description, the statuses of 10057 and 30031, `is_dirty` being null rather than false while in
-// sync, member overwrites being left out of the snapshot, and which role and channel fields it keeps.
+// GuildAlreadyHasTemplate. The contract run checks 50013 without Manage Server and an unknown
+// code's 404 and 10057 nightly. Inferred, not checked: the code format, 50035 for a bad name or
+// description, the status of 30031, `is_dirty` being null rather than false while in sync, member
+// overwrites being left out of the snapshot, and which role and channel fields it keeps.
 
 const unknownTemplate = () =>
   respond.error(404, 10057, "Unknown Guild Template");
