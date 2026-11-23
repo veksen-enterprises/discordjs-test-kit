@@ -247,7 +247,15 @@ export async function runScenarios(
     });
     out.unknownTemplate = await call("GET", "/guilds/templates/contractnope");
     out.listSoundboardSounds = await call("GET", `${guild}/soundboard-sounds`);
-    out.roleMemberCounts = await call("GET", `${guild}/roles/member-counts`);
+    const counts = await call("GET", `${guild}/roles/member-counts`);
+    // Keyed by role id, and the two guilds' ids differ: compare one entry's shape.
+    out.roleMemberCounts = {
+      status: counts.status,
+      body:
+        counts.body && typeof counts.body === "object"
+          ? { "<role id>": Object.values(counts.body)[0] }
+          : counts.body,
+    };
     out.listAppEmojis = await call(
       "GET",
       `/applications/${target.botId}/emojis`,
