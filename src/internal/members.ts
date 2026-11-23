@@ -63,10 +63,11 @@ export function registerMemberRoutes(
     (guild.ownerId === bot || highest(guild, bot) > highest(guild, targetId));
   // The bot's own member update reaches it without GUILD_MEMBERS: the contract run got one, on
   // the Guilds intent alone, when the bot changed its nickname.
+  // Guild Member Update has no deaf or mute (seen in the contract run), unlike REST's member.
   const announceUpdate = (guild: GuildRecord, member: APIGuildMember) =>
     gateway.dispatch(
       GatewayDispatchEvents.GuildMemberUpdate,
-      { ...member, guild_id: guild.id },
+      { ...member, deaf: undefined, mute: undefined, guild_id: guild.id },
       member.user.id === bot
         ? GatewayIntentBits.Guilds
         : GatewayIntentBits.GuildMembers,
