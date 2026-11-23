@@ -593,7 +593,7 @@ export function registerMemberRoutes(
 
   // Create Guild Role: "All JSON params are optional"; name defaults to "new role", permissions to
   // @everyone's. Fires GUILD_ROLE_CREATE. Where the new role sits isn't documented: the mock puts
-  // it at position 1, just above @everyone, as Discord's app shows new roles (inferred, not checked).
+  // it at position 1, just above @everyone, as Discord's app shows new roles (checked nightly).
   rest.route(
     "POST",
     "/guilds/:guildId/roles",
