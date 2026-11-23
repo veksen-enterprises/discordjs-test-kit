@@ -234,6 +234,8 @@ export interface Member<G extends string = string> extends Handle<"member", G> {
   ): { thread: Thread<G>; message: Message };
   /** Reacts to `message` with a unicode emoji. */
   react(message: Message, emoji: string): void;
+  /** Takes back their reaction to `message`; the bot hears `messageReactionRemove`. */
+  unreact(message: Message, emoji: string): void;
   /**
    * Votes in the poll on `message` for the answer labelled `answer`, or several where the poll
    * allows it. The bot hears `messagePollVoteAdd` with GuildMessagePolls. Voting again needs `unvote`
@@ -1194,6 +1196,10 @@ class MemberActor {
 
   react(message: Message, emoji: string): void {
     this.actor().react(message, emoji);
+  }
+
+  unreact(message: Message, emoji: string): void {
+    this.actor().unreact(message, emoji);
   }
 
   vote(message: Message, answer: string | string[]): void {

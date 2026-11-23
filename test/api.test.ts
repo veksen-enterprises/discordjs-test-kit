@@ -197,6 +197,36 @@ it("logs who added another bot to the server", async () => {
   ]).toEqual([admin.id, other.id]);
 });
 
+it("takes back a member's reaction, which the bot hears", async () => {
+  // Arrange
+  const discord = await createDiscord();
+  const server = discord.guild("SIN");
+  const general = discord.textChannel(server, "general");
+  const alice = discord.member(server, "alice");
+  const client = new Client({
+    intents: [
+      GatewayIntentBits.Guilds,
+      GatewayIntentBits.GuildMessages,
+      GatewayIntentBits.GuildMessageReactions,
+    ],
+    partials: [Partials.Message, Partials.Reaction],
+    ...discord.clientOptions,
+  });
+  const removed: string[] = [];
+  client.on(Events.MessageReactionRemove, (reaction, user) => {
+    removed.push(`${user.id} ${reaction.emoji.name}`);
+  });
+  await discord.start(client);
+  const panel = alice.post(general, { content: "React for a role" });
+  alice.react(panel, "🎮");
+
+  // Act
+  alice.unreact(panel, "🎮");
+
+  // Assert
+  await vi.waitFor(() => expect(removed).toEqual([`${alice.id} 🎮`]));
+});
+
 async function startRoleCheckBot() {
   const discord = await createDiscord();
   const server = discord.guild("SIN");

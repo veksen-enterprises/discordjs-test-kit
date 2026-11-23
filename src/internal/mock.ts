@@ -1016,6 +1016,8 @@ export class DiscordMock {
         this.userEditsMessage(user, message, content),
       react: (message: APIMessage, emoji: string) =>
         this.userReacts(user, message, emoji),
+      unreact: (message: APIMessage, emoji: string) =>
+        this.userRemovesReaction(user, message, emoji),
       /**
        * A new forum post: a thread plus its starter message, which shares the thread's id. `tags`
        * are the forum's tag names.
@@ -1174,6 +1176,39 @@ export class DiscordMock {
         `discordjs-test-kit: AutoMod blocked ${user.username}'s message${verdict.blocked ? `: "${verdict.blocked}"` : ""}`,
       );
     return message!;
+  }
+
+  /**
+   * `user` takes back their reaction: docs.discord.food/gateway/gateway-events#message-reaction-remove,
+   * on the same intents as the add. Nothing happens when they hadn't reacted with it.
+   */
+  private userRemovesReaction(
+    user: APIUser,
+    message: APIMessage,
+    emoji: string,
+  ) {
+    const channel = this.state.requireChannel(message.channel_id);
+    this.requireMembership(user, channel);
+    if (
+      !this.state.removeReaction(message.channel_id, message.id, emoji, user.id)
+    )
+      return;
+    const guildId = "guild_id" in channel ? channel.guild_id : undefined;
+    this.gateway.dispatch(
+      GatewayDispatchEvents.MessageReactionRemove,
+      {
+        user_id: user.id,
+        channel_id: channel.id,
+        message_id: message.id,
+        ...(guildId ? { guild_id: guildId } : {}),
+        emoji: { id: null, name: emoji },
+        type: 0,
+        burst: false,
+      },
+      guildId
+        ? GatewayIntentBits.GuildMessageReactions
+        : GatewayIntentBits.DirectMessageReactions,
+    );
   }
 
   private userReacts(user: APIUser, message: APIMessage, emoji: string) {

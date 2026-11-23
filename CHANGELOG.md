@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- New `member.unreact(message, emoji)`: a member takes back a reaction, and the bot hears `messageReactionRemove`, for reaction roles and giveaways.
 - Running a command now waits for the bot to go quiet first, as a click does, so work the bot left running after its last reply has finished. The quiet wait counts from the bot's last activity, so it no longer adds 100ms when the bot was already quiet.
 - `discord.member(server, name, { bot: true, addedBy })` logs a BOT_ADD audit entry by `addedBy` (the owner by default), and renaming the server logs GUILD_UPDATE with the old and new name.
 - A reply to a message that isn't in the channel is refused with Invalid Form Body (50035), naming `message_reference`, as Discord does; it used to fail the test as unsupported. Channel names lose the spaces around them, as on Discord.
