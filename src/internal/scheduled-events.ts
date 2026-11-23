@@ -433,7 +433,9 @@ export function registerScheduledEventRoutes(
         guild_scheduled_event_exceptions: [],
       } as APIGuildScheduledEvent;
       addEvent(mock, guild, state.bot.id, event, reasonOf(req));
-      return respond.json(event);
+      // Discord's create response has creator_id but no `creator` (seen in the contract run).
+      const { creator: _, ...created } = event;
+      return respond.json(created);
     }),
   );
 

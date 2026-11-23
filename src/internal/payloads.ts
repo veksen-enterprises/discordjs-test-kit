@@ -111,6 +111,13 @@ export function guildCreatePayload(
         ];
   return {
     ...guildPayload(guild),
+    // GUILD_CREATE's roles have no `description`, though REST's do (seen in the contract run).
+    roles: [...guild.roles.values()].map((role) => {
+      const { description: _, ...rest } = role as typeof role & {
+        description?: string | null;
+      };
+      return rest;
+    }),
     joined_at: new Date().toISOString(),
     large: false,
     unavailable: false,
