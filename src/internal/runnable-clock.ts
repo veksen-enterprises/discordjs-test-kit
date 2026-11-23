@@ -1,6 +1,8 @@
 /**
- * Time the process could run, for the kit's own waits: the quiet spell before a click, the
- * interaction deadline, how long a run waits on a busy bot.
+ * Time the process could run, for the kit's own heuristics: the quiet spell before a click, how
+ * long a run waits on a busy bot, how long a find waits. Discord's own deadlines (the interaction's
+ * 3 seconds) stay on the wall clock, `wall` below: a starved bot is late on Discord too, and a
+ * runnable deadline would pass a bot slower than Discord allows.
  *
  * The bot and the kit share one process. When the OS starves it (a loaded CI runner, a laptop
  * running ten suites), every wall-clock timer comes due at once when it wakes, and the kit's
@@ -13,9 +15,18 @@
  * loop with synchronous work still spends its deadline, as it would on Discord.
  */
 
-// Taken at load, so a test that fakes timers or `performance` doesn't stop the kit's clock.
+// Taken at load, so a test that fakes timers or `performance` doesn't stop the kit's clocks.
 const realSetTimeout = globalThis.setTimeout;
+const realClearTimeout = globalThis.clearTimeout;
 const realNow = performance.now.bind(performance);
+
+/** The wall clock, as it was when the kit loaded. */
+export const wall = {
+  now: realNow,
+  setTimeout: (fn: () => void, ms: number) => realSetTimeout(fn, ms),
+  clearTimeout: (timer: ReturnType<typeof realSetTimeout> | undefined) =>
+    realClearTimeout(timer),
+};
 
 const TICK_MS = 5;
 /** How late a tick can be and still count in full: timer jitter, not a stall. */
@@ -70,14 +81,14 @@ class RunnableClock {
   }
 
   private sample() {
-    const wall = realNow();
+    const at = realNow();
     const cpu = cpuMs();
-    const gap = wall - this.lastWall;
+    const gap = at - this.lastWall;
     this.elapsed +=
       gap <= TICK_MS + LATE_MS
         ? gap
         : Math.min(gap, TICK_MS + (cpu - this.lastCpu));
-    this.lastWall = wall;
+    this.lastWall = at;
     this.lastCpu = cpu;
   }
 

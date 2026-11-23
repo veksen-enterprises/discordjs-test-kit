@@ -127,7 +127,7 @@ describe("scenarios against the mock", () => {
     expect(responses.sendWithoutPermission!.body).toMatchObject({
       code: 50013,
     });
-  });
+  }, 20_000);
 });
 
 describe.skipIf(!TOKEN)("mock against real Discord", () => {

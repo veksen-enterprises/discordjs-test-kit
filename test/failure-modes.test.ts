@@ -10,7 +10,7 @@ import {
  * What a bot sees when Discord misbehaves, and whether the mock makes discord.js react the way it
  * does in production. Each expectation is about @discordjs/rest's real behaviour, not the mock's.
  */
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   createDiscordMock,
   Permission,
@@ -228,9 +228,10 @@ describe("interaction rules", () => {
       mock: { interactionDeadlineMs: 50 },
     });
     const run = mock.as(alice).slashCommand(general, "lazy");
-    await new Promise((r) => setTimeout(r, 250));
+    await vi.waitFor(() =>
+      expect(bot.errors[0]).toMatchObject({ code: 10062 }),
+    );
     expect(run.state).toBe("pending");
-    expect(bot.errors[0]).toMatchObject({ code: 10062 });
   });
 
   it("waits for the reply as long as Discord's deadline, and says what the user sees", async () => {

@@ -67,7 +67,7 @@ import {
   type RestHandler,
   type RestRequest,
 } from "./rest.js";
-import { runnable } from "./runnable-clock.js";
+import { runnable, wall } from "./runnable-clock.js";
 import { registerScheduledEventRoutes } from "./scheduled-events.js";
 import { snowflake } from "./snowflake.js";
 import { registerSoundboardRoutes } from "./soundboard.js";
@@ -157,7 +157,8 @@ export class InteractionRun extends EventEmitter<{ change: [] }> {
   readonly followups: APIMessage[] = [];
   /** The bot deleted its reply (DELETE @original). */
   replyDeleted = false;
-  readonly createdAt = runnable.now();
+  // Discord's deadline runs on its clock, which a starved bot process can't slow: wall time.
+  readonly createdAt = wall.now();
 
   constructor(
     private mock: DiscordMock,
@@ -190,7 +191,8 @@ export class InteractionRun extends EventEmitter<{ change: [] }> {
         cleanup();
         resolve(this);
       };
-      const timer = runnable.setTimeout(() => {
+      // Wall time: this waits out Discord's deadline, which a starved process can't stretch.
+      const timer = wall.setTimeout(() => {
         cleanup();
         reject(
           new Error(
@@ -199,7 +201,7 @@ export class InteractionRun extends EventEmitter<{ change: [] }> {
         );
       }, timeoutMs);
       const cleanup = () => {
-        runnable.clearTimeout(timer);
+        wall.clearTimeout(timer);
         this.off("change", check);
       };
       this.on("change", check);
@@ -221,7 +223,8 @@ export class InteractionRun extends EventEmitter<{ change: [] }> {
   ): Promise<this> {
     return new Promise((resolve, reject) => {
       let timer: ReturnType<typeof runnable.setTimeout> | undefined;
-      const busy = runnable.setTimeout(() => {
+      // Wall time: this bounds how long a test runs, whatever the machine's load.
+      const busy = wall.setTimeout(() => {
         cleanup();
         const latest = this.mock.rest.log
           .slice(-3)
@@ -253,7 +256,7 @@ export class InteractionRun extends EventEmitter<{ change: [] }> {
       };
       const cleanup = () => {
         runnable.clearTimeout(timer);
-        runnable.clearTimeout(busy);
+        wall.clearTimeout(busy);
         this.off("change", check);
         this.mock.activity.off("change", arm);
       };
@@ -2887,7 +2890,7 @@ export class DiscordMock {
       if (!run || run.token !== req.params.token)
         return respond.unknownInteraction();
       if (run.state !== "pending") return respond.alreadyAcknowledged();
-      if (runnable.now() - run.createdAt > this.interactionDeadlineMs)
+      if (wall.now() - run.createdAt > this.interactionDeadlineMs)
         return respond.unknownInteraction();
 
       const body = req.body as RESTPostAPIInteractionCallbackJSONBody;
