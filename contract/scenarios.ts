@@ -6,6 +6,8 @@ export interface Observation {
 }
 
 const SEND_MESSAGES = 1n << 11n;
+const READ_MESSAGE_HISTORY = 1n << 16n;
+const MANAGE_GUILD = 1n << 5n;
 const MANAGE_CHANNELS = 1n << 4n;
 
 /**
@@ -188,6 +190,47 @@ export async function runScenarios(
       `/channels/${channelId}/messages`,
       { flags: 1 << 15, content: "not allowed", components: [card] },
     );
+    out.typing = await call("POST", `/channels/${channelId}/typing`);
+    out.sendTooLong = await call("POST", `/channels/${channelId}/messages`, {
+      content: "x".repeat(2001),
+    });
+    out.sendPollWithoutAnswers = await call(
+      "POST",
+      `/channels/${channelId}/messages`,
+      { poll: { question: { text: "?" }, answers: [], duration: 1 } },
+    );
+    const first = await call("POST", `/channels/${channelId}/messages`, {
+      content: "one",
+    });
+    const second = await call("POST", `/channels/${channelId}/messages`, {
+      content: "two",
+    });
+    const ids = [first, second].map((m) => (m.body as { id?: string })?.id);
+    if (ids[0] && ids[1]) {
+      await call(
+        "PUT",
+        `/channels/${channelId}/messages/${ids[0]}/reactions/%F0%9F%91%8D/@me`,
+      );
+      // Reading who reacted is taken to need Read Message History, like reading the message.
+      await call("PUT", `/channels/${channelId}/permissions/${target.botId}`, {
+        type: 1,
+        allow: "0",
+        deny: String(READ_MESSAGE_HISTORY),
+      });
+      out.listReactionsWithoutHistory = await call(
+        "GET",
+        `/channels/${channelId}/messages/${ids[0]}/reactions/%F0%9F%91%8D`,
+      );
+      await call(
+        "DELETE",
+        `/channels/${channelId}/permissions/${target.botId}`,
+      );
+      out.bulkDeleteDuplicate = await call(
+        "POST",
+        `/channels/${channelId}/messages/bulk-delete`,
+        { messages: [ids[0], ids[0], ids[1]] },
+      );
+    }
     out.sendButtons = await call("POST", `/channels/${channelId}/messages`, {
       content: "buttons",
       components: [
@@ -316,6 +359,12 @@ export async function runScenarios(
       out.getRole = await call(
         "GET",
         `/guilds/${target.guildId}/roles/${roleId}`,
+      );
+      // The invite has no Manage Server, so an overwrite granting it must be refused.
+      out.overwriteGrantingUnheld = await call(
+        "PUT",
+        `/channels/${channelId}/permissions/${roleId}`,
+        { type: 0, allow: String(MANAGE_GUILD), deny: "0" },
       );
       out.editRole = await call(
         "PATCH",
