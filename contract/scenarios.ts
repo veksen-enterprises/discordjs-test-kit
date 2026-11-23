@@ -150,16 +150,14 @@ export async function runScenarios(
     out.editSlowmodeTooHigh = await call("PATCH", `/channels/${channelId}`, {
       rate_limit_per_user: 21_601,
     });
-    // Discovery, Discord only: the kit leaves a reply to an unknown message unmodelled.
-    if (target.name === "discord")
-      out.discoverReplyToUnknownMessage = await call(
-        "POST",
-        `/channels/${channelId}/messages`,
-        {
-          content: "reply",
-          message_reference: { message_id: "1000000000000000000" },
-        },
-      );
+    out.replyToUnknownMessage = await call(
+      "POST",
+      `/channels/${channelId}/messages`,
+      {
+        content: "reply",
+        message_reference: { message_id: "1000000000000000000" },
+      },
+    );
     out.threadNameTooLong = await call(
       "POST",
       `/channels/${channelId}/threads`,
@@ -353,6 +351,15 @@ export async function runScenarios(
       name: "  contract-spaced  ",
       type: 0,
     });
+    // Not a response: 1 when the name came back trimmed.
+    out.channelNameTrimmed = {
+      status:
+        (out.createChannelSpaced.body as { name?: string })?.name ===
+        "contract-spaced"
+          ? 1
+          : 0,
+      body: null,
+    };
     const spacedId = (out.createChannelSpaced.body as { id?: string })?.id;
     if (spacedId) await call("DELETE", `/channels/${spacedId}`);
     out.createChannelNameTooLong = await call("POST", `${guild}/channels`, {

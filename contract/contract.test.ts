@@ -95,6 +95,8 @@ describe("scenarios against the mock", () => {
       getRole: 200,
       typing: 204,
       createChannelSpaced: 201,
+      channelNameTrimmed: 1,
+      replyToUnknownMessage: 400,
       editTopicTooLong: 400,
       editSlowmodeTooHigh: 400,
       threadNameTooLong: 400,
