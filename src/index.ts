@@ -561,14 +561,20 @@ class Discord {
     if (options.appOwner) this.mock.developerId = options.appOwner.id;
     if (options.permissions !== undefined)
       this.mock.grantBot(options.permissions);
-    if (client.token && client.token !== this.mock.token)
+    // client.token alone doesn't say the bot logged in: discord.js copies DISCORD_TOKEN into it
+    // when the client is built. Its gateway manager (`ws._ws`) exists only once login() has
+    // started (WebSocketManager#connect).
+    const loggingIn =
+      client.isReady() ||
+      // oxlint-disable-next-line no-underscore-dangle -- discord.js's own field; CI's oldest-version job runs this
+      (client.ws as unknown as { _ws?: unknown })._ws != null;
+    if (loggingIn && client.token !== this.mock.token)
       throw new Error(
         "discordjs-test-kit: the bot logged in with a token that isn't discord.token, so it isn't talking to this fake Discord",
       );
     if (!client.isReady()) {
       const ready = once(client, "clientReady");
-      // discord.js sets client.token as soon as login() starts: the bot is logging itself in.
-      if (!client.token) await client.login(this.mock.token);
+      if (!loggingIn) await client.login(this.mock.token);
       await ready;
     }
     if (options.commands)

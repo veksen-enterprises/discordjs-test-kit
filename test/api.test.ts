@@ -159,13 +159,39 @@ it("refuses a bot that logged in with another token", async () => {
   // Arrange
   const discord = await createDiscord();
   const client = new Client({ intents: [], ...discord.clientOptions });
-  client.token = "Bot.not.this";
+  // Its own login fails against the kit; start must still name the token.
+  void client.login("Bot.not.this").catch(() => {});
 
   // Act
   const started = discord.start(client);
 
   // Assert
   await expect(started).rejects.toThrow("a token that isn't discord.token");
+});
+
+it("logs in a bot whose client picked up another DISCORD_TOKEN but never logged in", async () => {
+  // Arrange: discord.js copies DISCORD_TOKEN into client.token when the client is built.
+  vi.stubEnv("DISCORD_TOKEN", "from-the-bot-env");
+  const discord = await createDiscord();
+  const server = discord.guild("SIN");
+  const general = discord.textChannel(server, "general");
+  const alice = discord.member(server, "alice");
+  const client = new Client({
+    intents: [GatewayIntentBits.Guilds],
+    ...discord.clientOptions,
+  });
+  vi.unstubAllEnvs();
+  client.on(Events.InteractionCreate, async (interaction) => {
+    if (interaction.isChatInputCommand()) await interaction.reply("pong");
+  });
+
+  // Act
+  await discord.start(client, {
+    commands: [{ name: "ping", description: "Pings" }],
+  });
+
+  // Assert
+  expect((await alice.runCommand(general, "ping")).content).toBe("pong");
 });
 
 it("logs who added another bot to the server", async () => {
