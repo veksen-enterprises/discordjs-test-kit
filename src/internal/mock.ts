@@ -2713,7 +2713,8 @@ export class DiscordMock {
     // docs.discord.food/resources/channel#list-public-archived-threads, #list-private-archived-threads
     // and #list-joined-private-archived-threads: archived threads of the channel, `limit` 2-100
     // (default 50). Public lists public and announcement threads, private lists private threads
-    // and also needs MANAGE_THREADS; both go newest archive_timestamp first with `before` an ISO
+    // and also needs MANAGE_THREADS, refused with 50001 Missing Access rather than 50013 (checked
+    // by the contract run); both go newest archive_timestamp first with `before` an ISO
     // timestamp. Joined lists the private threads the bot is in, newest id first with `before` an
     // id. `members` has the bot's thread member for each thread it joined.
     type Thread = APIChannel & {
@@ -2725,6 +2726,8 @@ export class DiscordMock {
       needed: bigint,
       include: (thread: Thread) => boolean,
       ordered: (threads: Thread[], before: string | null) => Thread[],
+      /** Permissions whose absence Discord answers with 50001, not 50013. */
+      access = 0n,
     ) =>
       rest.route(
         "GET",
@@ -2734,6 +2737,8 @@ export class DiscordMock {
           if (!channel) return respond.unknownChannel();
           const denied = this.checkBotPerms(channel, needed);
           if (denied) return denied;
+          if (access && this.checkBotPerms(channel, access))
+            return respond.missingAccess();
           const limit = Number(req.query.get("limit") ?? 50);
           const archived = ordered(
             [...state.channels.values()].filter(
@@ -2777,9 +2782,10 @@ export class DiscordMock {
     );
     archivedRoute(
       "/channels/:channelId/threads/archived/private",
-      Permission.ReadMessageHistory | Permission.ManageThreads,
+      Permission.ReadMessageHistory,
       isPrivate,
       byArchiveTime,
+      Permission.ManageThreads,
     );
     archivedRoute(
       "/channels/:channelId/users/@me/threads/archived/private",

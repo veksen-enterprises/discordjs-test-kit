@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Listing archived private threads without Manage Threads is refused with Missing Access (50001), as Discord does, instead of Missing Permissions (50013).
+
 ## 0.5.0
 
 ### Changed

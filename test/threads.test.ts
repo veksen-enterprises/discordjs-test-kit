@@ -359,7 +359,7 @@ it("lists every archived private thread with Manage Threads", async () => {
   expect([...archived.threads.keys()]).toEqual([thread.id]);
 });
 
-it("refuses every archived private thread without Manage Threads", async () => {
+it("refuses every archived private thread without Manage Threads, with Missing Access", async () => {
   // Arrange
   const { channel } = await archivedPrivateThread(
     Permission.ReadMessageHistory,
@@ -372,7 +372,7 @@ it("refuses every archived private thread without Manage Threads", async () => {
   });
 
   // Assert
-  await expect(archived).rejects.toMatchObject({ code: 50013 });
+  await expect(archived).rejects.toMatchObject({ code: 50001 });
 });
 
 it("lists the archived private threads the bot joined", async () => {
