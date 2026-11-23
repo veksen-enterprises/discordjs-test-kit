@@ -191,6 +191,39 @@ export async function runScenarios(
       { flags: 1 << 15, content: "not allowed", components: [card] },
     );
     out.typing = await call("POST", `/channels/${channelId}/typing`);
+    // Limits whose field codes are inferred (src/internal/limits.ts).
+    out.sendTooManyEmbeds = await call(
+      "POST",
+      `/channels/${channelId}/messages`,
+      {
+        embeds: Array.from({ length: 11 }, (_, i) => ({ title: `e${i}` })),
+      },
+    );
+    out.sendEmbedTitleTooLong = await call(
+      "POST",
+      `/channels/${channelId}/messages`,
+      { embeds: [{ title: "x".repeat(257) }] },
+    );
+    out.pollTooManyAnswers = await call(
+      "POST",
+      `/channels/${channelId}/messages`,
+      {
+        poll: {
+          question: { text: "?" },
+          answers: Array.from({ length: 11 }, (_, i) => ({
+            poll_media: { text: `a${i}` },
+          })),
+          duration: 1,
+        },
+      },
+    );
+    out.pollTooLong = await call("POST", `/channels/${channelId}/messages`, {
+      poll: {
+        question: { text: "?" },
+        answers: [{ poll_media: { text: "a" } }],
+        duration: 769,
+      },
+    });
     out.sendTooLong = await call("POST", `/channels/${channelId}/messages`, {
       content: "x".repeat(2001),
     });
@@ -275,6 +308,27 @@ export async function runScenarios(
       ],
     });
     const guild = `/guilds/${target.guildId}`;
+    out.createChannelNameTooLong = await call("POST", `${guild}/channels`, {
+      name: "x".repeat(101),
+      type: 0,
+    });
+    // The invite has no Create Expressions.
+    out.createEmojiWithoutPermission = await call("POST", `${guild}/emojis`, {
+      name: "contract",
+      image:
+        "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
+    });
+    out.createSoundWithoutPermission = await call(
+      "POST",
+      `${guild}/soundboard-sounds`,
+      { name: "contract", sound: "data:audio/ogg;base64,T2dnUw==" },
+    );
+    // Change Nickname: whether the test guild's @everyone grants it is what this checks.
+    out.setOwnNickname = await call("PATCH", `${guild}/members/@me`, {
+      nick: "contract",
+    });
+    if (out.setOwnNickname.status === 200)
+      await call("PATCH", `${guild}/members/@me`, { nick: null });
     out.listGuildChannels = await call("GET", `${guild}/channels`);
     out.listGuilds = await call("GET", "/users/@me/guilds");
     out.getGuild = await call("GET", `${guild}?with_counts=true`);
@@ -300,6 +354,16 @@ export async function runScenarios(
       );
       out.listGuildInvites = await call("GET", `${guild}/invites`);
       out.deleteInvite = await call("DELETE", `/invites/${code}`);
+    }
+    if (target.name === "discord") {
+      out.discoverInviteOver7Days = await call(
+        "POST",
+        `/channels/${channelId}/invites`,
+        { max_age: 604_801, unique: true },
+      );
+      const long = (out.discoverInviteOver7Days.body as { code?: string })
+        ?.code;
+      if (long) await call("DELETE", `/invites/${long}`);
     }
     out.unknownInvite = await call("GET", "/invites/contractnope");
     out.botVoiceState = await call("GET", `${guild}/voice-states/@me`);
@@ -355,11 +419,19 @@ export async function runScenarios(
       entity_metadata: { location: "contract" },
     });
     const eventId = (out.createScheduledEvent.body as { id?: string })?.id;
-    if (eventId)
+    if (eventId) {
+      // "Only the following are valid status changes: SCHEDULED --> ACTIVE, ACTIVE --> COMPLETED,
+      // SCHEDULED --> CANCELED"; the code for another is inferred.
+      out.eventSkipsToCompleted = await call(
+        "PATCH",
+        `${guild}/scheduled-events/${eventId}`,
+        { status: 3 },
+      );
       out.deleteScheduledEvent = await call(
         "DELETE",
         `${guild}/scheduled-events/${eventId}`,
       );
+    }
     const commands = `/applications/${target.botId}${guild}/commands`;
     out.listCommandPermissions = await call("GET", `${commands}/permissions`);
     out.appCommandPermissions = await call(
@@ -381,6 +453,12 @@ export async function runScenarios(
       `/channels/${channelId}/messages`,
       { content: "should be refused" },
     );
+    // Discovery, Discord only: the kit leaves these unmodelled.
+    if (target.name === "discord")
+      out.discoverTypingWithoutSend = await call(
+        "POST",
+        `/channels/${channelId}/typing`,
+      );
     out.deleteOverwrite = await call(
       "DELETE",
       `/channels/${channelId}/permissions/${target.botId}`,
