@@ -323,6 +323,21 @@ it("lets an overwrite grant what the bot doesn't hold once the bot has Manage Ro
   });
 });
 
+it("deletes the banned member's messages from the window the bot asks for, and keeps older ones", async () => {
+  // Arrange
+  const { guild, record, alice } = await start(Permission.BanMembers);
+  const general = mock.createTextChannel(record, "general");
+  const old = mock.as(alice).sendMessage(general, "last week");
+  old.timestamp = new Date(Date.now() - 2 * 3_600_000).toISOString();
+  mock.as(alice).sendMessage(general, "spam");
+
+  // Act
+  await guild.members.ban(alice.id, { deleteMessageSeconds: 3_600 });
+
+  // Assert
+  expect(mock.messagesIn(general).map((m) => m.content)).toEqual(["last week"]);
+});
+
 it("lists the guild's bans", async () => {
   // Arrange
   const { guild, alice } = await start(Permission.BanMembers);

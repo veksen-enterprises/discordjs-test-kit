@@ -354,13 +354,15 @@ export function registerMemberRoutes(
         (guild.members.has(userId) && !outranks(guild, userId))
       )
         return respond.missingPermissions();
-      // Deleting the user's recent messages isn't modelled: say so rather than pretend.
+      // docs.discord.food Create Guild Ban: `delete_message_seconds` "0-604800, default 0" deletes
+      // "previous messages sent by the banned user". Out of range answering 50035 is inferred.
       const seconds = Number(
         (req.body as RESTPutAPIGuildBanJSONBody | undefined)
           ?.delete_message_seconds ?? 0,
       );
-      if (seconds > 0) return rest.gap("ban with delete_message_seconds");
-      banUser(mock, guild, user, bot, reasonOf(req));
+      if (!Number.isInteger(seconds) || seconds < 0 || seconds > 604_800)
+        return respond.invalidFormBody();
+      banUser(mock, guild, user, bot, reasonOf(req), seconds);
       return respond.noContent();
     }),
   );
@@ -789,14 +791,39 @@ function announceBan(
   guild: GuildRecord,
   t: string,
   ban: APIBan,
+  extra: Record<string, unknown> = {},
 ) {
   const perms = computePermissions(mock.state, guild, mock.state.bot.id);
   if (perms & (Permission.BanMembers | Permission.ViewAuditLog))
     mock.gateway.dispatch(
       t,
-      { guild_id: guild.id, user: ban.user },
+      { guild_id: guild.id, user: ban.user, ...extra },
       GatewayIntentBits.GuildModeration,
     );
+}
+
+/**
+ * Removes `user`'s messages in `guild` (threads included) posted within the last `seconds`. Guild
+ * Ban Add carries `delete_message_secs` (docs.discord.food gateway-events). Neither page says the
+ * deletion fires Message Delete events, so the mock sends none: a bot that needs them fails here
+ * rather than passing where Discord might not send them. Inferred, not checked.
+ */
+function deleteRecentMessages(
+  mock: DiscordMock,
+  guild: GuildRecord,
+  user: APIUser,
+  seconds: number,
+) {
+  const since = Date.now() - seconds * 1000;
+  for (const channel of mock.state.channels.values()) {
+    if (!("guild_id" in channel) || channel.guild_id !== guild.id) continue;
+    for (const message of [...(mock.state.messages.get(channel.id) ?? [])])
+      if (
+        message.author.id === user.id &&
+        Date.parse(message.timestamp) >= since
+      )
+        mock.state.deleteMessage(channel.id, message.id);
+  }
 }
 
 /** `executorId` kicks `user`: GUILD_MEMBER_REMOVE, and a MEMBER_KICK audit log entry. */
@@ -826,11 +853,16 @@ export function banUser(
   user: APIUser,
   executorId: string,
   reason?: string,
+  deleteMessageSeconds = 0,
 ) {
   const ban: APIBan = { user, reason: reason ?? null };
   guild.bans.set(user.id, ban);
   if (guild.members.has(user.id)) mock.removeMember(guild, user);
-  announceBan(mock, guild, GatewayDispatchEvents.GuildBanAdd, ban);
+  if (deleteMessageSeconds > 0)
+    deleteRecentMessages(mock, guild, user, deleteMessageSeconds);
+  announceBan(mock, guild, GatewayDispatchEvents.GuildBanAdd, ban, {
+    delete_message_secs: deleteMessageSeconds,
+  });
   recordAudit(mock, guild, {
     action_type: AuditLogEvent.MemberBanAdd,
     user_id: executorId,

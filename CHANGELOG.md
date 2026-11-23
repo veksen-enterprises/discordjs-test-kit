@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Bans: `members.ban(user, { deleteMessageSeconds })` works, and removes the member's messages from that window. It used to fail the test as unsupported.
 - A bot deleting a member's message in their DMs is refused (50003), as Discord refuses it; it used to succeed.
 - The wait before a click, the 3-second interaction deadline and the other waits on the bot count only time the test process could run. On a loaded machine (a busy CI runner, several suites at once), a pause the OS imposes no longer makes a working bot look late or quiet.
 - Setting a channel overwrite that allows or denies a permission the bot doesn't hold is refused with Missing Permissions (50013), as Discord does. It used to succeed, so a bot that does this passed its tests and failed on Discord.
