@@ -10,7 +10,7 @@ import {
   VoiceConnectionStatus,
 } from "@discordjs/voice";
 import { Client, Events, GatewayIntentBits } from "discord.js";
-import { afterEach, beforeEach, expect, it } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { createDiscordMock, type DiscordMock } from "../src/internal/mock.js";
 import { Permission } from "../src/internal/payloads.js";
 
@@ -136,9 +136,9 @@ it("leaves a Gap when the bot joins voice without Connect", async () => {
     op: 4,
     d: { guild_id: cached.id, channel_id: locked.id },
   });
-  await new Promise((r) => setTimeout(r, 50));
-
-  expect(mock.rest.unhandled).toEqual([
-    "joining voice without View Channel and Connect",
-  ]);
+  await vi.waitFor(() =>
+    expect(mock.rest.unhandled).toEqual([
+      "joining voice without View Channel and Connect",
+    ]),
+  );
 });

@@ -24,8 +24,8 @@ const commands = [
     .toJSON(),
 ];
 
-/** Replies, works 50ms away from Discord (a database query, say), then starts its collector. */
-function createSlowCollectorBot(options: object) {
+/** Replies, works `workMs` away from Discord (a database query, say), then starts its collector. */
+function createSlowCollectorBot(options: object, workMs = 50) {
   const client = new Client({
     intents: [GatewayIntentBits.Guilds],
     ...options,
@@ -45,7 +45,7 @@ function createSlowCollectorBot(options: object) {
       ],
     });
     await interaction.reply(view());
-    await sleep(50);
+    await sleep(workMs);
     const dashboard = await interaction.fetchReply();
     const collector = dashboard.createMessageComponentCollector();
     collector.on("collect", async (click) => {
@@ -57,12 +57,12 @@ function createSlowCollectorBot(options: object) {
   return client;
 }
 
-async function openDashboard(options?: DiscordOptions) {
+async function openDashboard(options?: DiscordOptions, workMs?: number) {
   const discord = await createDiscord(options);
   const server = discord.guild("Titan");
   const general = discord.textChannel(server, "general");
   const owner = discord.owner(server);
-  await discord.start(createSlowCollectorBot(discord.clientOptions), {
+  await discord.start(createSlowCollectorBot(discord.clientOptions, workMs), {
     commands,
   });
   const dashboard = await owner.runCommand(general, "dashboard");
@@ -81,8 +81,8 @@ it("clicks once the bot has started its collector after a little work of its own
 });
 
 it("clicks before the collector is up when quietTimeMs is shorter than the bot's work", async () => {
-  // Arrange
-  const { owner, dashboard } = await openDashboard({ quietTimeMs: 0 });
+  // Arrange: a second of work, so a loaded machine can't delay the click past it.
+  const { owner, dashboard } = await openDashboard({ quietTimeMs: 0 }, 1_000);
 
   // Act
   const click = owner.click(dashboard, "Toggle");
