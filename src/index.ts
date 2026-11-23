@@ -521,7 +521,9 @@ class Discord {
 
   /**
    * Logs `client` in (it must have been built with `clientOptions`), waits for ready, and registers
-   * `commands` the way a deploy script would. The client is destroyed when the test ends.
+   * `commands` the way a deploy script would. The client is destroyed when the test ends. A bot that
+   * logs itself in, on import or in its framework's setup, does so with `discord.token`; `start`
+   * then waits for it instead of logging in again.
    *
    * `permissions` are what the bot's invite link grants: the bot gets a role with them in every
    * guild, including one built after `start`. Without it, it has only @everyone's. `appOwner`
@@ -542,9 +544,16 @@ class Discord {
     if (options.appOwner) this.mock.developerId = options.appOwner.id;
     if (options.permissions !== undefined)
       this.mock.grantBot(options.permissions);
-    const ready = once(client, "clientReady");
-    await client.login(this.mock.token);
-    await ready;
+    if (client.token && client.token !== this.mock.token)
+      throw new Error(
+        "discordjs-test-kit: the bot logged in with a token that isn't discord.token, so it isn't talking to this fake Discord",
+      );
+    if (!client.isReady()) {
+      const ready = once(client, "clientReady");
+      // discord.js sets client.token as soon as login() starts: the bot is logging itself in.
+      if (!client.token) await client.login(this.mock.token);
+      await ready;
+    }
     if (options.commands)
       await client.application!.commands.set(options.commands);
   }

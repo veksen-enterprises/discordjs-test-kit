@@ -97,6 +97,44 @@ it("lets a member DM the bot and finds the answer in their DMs", async () => {
   expect((await discord.waitForDM(alice, "pong")).content).toBe("pong");
 });
 
+it("waits for a bot that logs itself in with the test's token", async () => {
+  // Arrange
+  const discord = await createDiscord();
+  const server = discord.guild("SIN");
+  const general = discord.textChannel(server, "general");
+  const alice = discord.member(server, "alice");
+  const client = new Client({
+    intents: [GatewayIntentBits.Guilds],
+    ...discord.clientOptions,
+  });
+  client.on(Events.InteractionCreate, async (interaction) => {
+    if (interaction.isChatInputCommand()) await interaction.reply("pong");
+  });
+  // As a bot does on import, from its own config.
+  void client.login(discord.token);
+
+  // Act
+  await discord.start(client, {
+    commands: [{ name: "ping", description: "Pings" }],
+  });
+
+  // Assert
+  expect((await alice.runCommand(general, "ping")).content).toBe("pong");
+});
+
+it("refuses a bot that logged in with another token", async () => {
+  // Arrange
+  const discord = await createDiscord();
+  const client = new Client({ intents: [], ...discord.clientOptions });
+  client.token = "Bot.not.this";
+
+  // Act
+  const started = discord.start(client);
+
+  // Assert
+  await expect(started).rejects.toThrow("a token that isn't discord.token");
+});
+
 async function startRoleCheckBot() {
   const discord = await createDiscord();
   const server = discord.guild("SIN");
