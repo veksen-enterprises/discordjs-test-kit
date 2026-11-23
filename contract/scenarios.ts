@@ -236,6 +236,45 @@ export async function runScenarios(
       "GET",
       `${guild}/scheduled-events/1`,
     );
+    // The invite has no Manage Server: the widget settings and templates must be refused.
+    out.widgetSettings = await call("GET", `${guild}/widget`);
+    out.widgetJson = await call("GET", `${guild}/widget.json`);
+    out.preview = await call("GET", `${guild}/preview`);
+    out.unknownSticker = await call("GET", "/stickers/1");
+    out.listTemplates = await call("GET", `${guild}/templates`);
+    out.createTemplate = await call("POST", `${guild}/templates`, {
+      name: "contract",
+    });
+    out.unknownTemplate = await call("GET", "/guilds/templates/contractnope");
+    out.listSoundboardSounds = await call("GET", `${guild}/soundboard-sounds`);
+    out.roleMemberCounts = await call("GET", `${guild}/roles/member-counts`);
+    out.listAppEmojis = await call(
+      "GET",
+      `/applications/${target.botId}/emojis`,
+    );
+    out.archivedPrivateThreads = await call(
+      "GET",
+      `/channels/${channelId}/threads/archived/private`,
+    );
+    out.channelPositions = await call("PATCH", `${guild}/channels`, [
+      { id: channelId, position: 0 },
+    ]);
+    // The invite has no Create Events; whether @everyone grants it is what this checks.
+    const start = new Date(Date.now() + 86_400_000).toISOString();
+    out.createScheduledEvent = await call("POST", `${guild}/scheduled-events`, {
+      name: "contract event",
+      privacy_level: 2,
+      entity_type: 3,
+      scheduled_start_time: start,
+      scheduled_end_time: new Date(Date.parse(start) + 3_600_000).toISOString(),
+      entity_metadata: { location: "contract" },
+    });
+    const eventId = (out.createScheduledEvent.body as { id?: string })?.id;
+    if (eventId)
+      out.deleteScheduledEvent = await call(
+        "DELETE",
+        `${guild}/scheduled-events/${eventId}`,
+      );
     const commands = `/applications/${target.botId}${guild}/commands`;
     out.listCommandPermissions = await call("GET", `${commands}/permissions`);
     out.appCommandPermissions = await call(
@@ -266,6 +305,10 @@ export async function runScenarios(
     });
     const roleId = (out.createRole.body as { id?: string })?.id;
     if (roleId) {
+      out.getRole = await call(
+        "GET",
+        `/guilds/${target.guildId}/roles/${roleId}`,
+      );
       out.editRole = await call(
         "PATCH",
         `/guilds/${target.guildId}/roles/${roleId}`,
