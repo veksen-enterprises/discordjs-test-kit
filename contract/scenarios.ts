@@ -144,6 +144,30 @@ export async function runScenarios(
       topic: "contract topic",
       rate_limit_per_user: 5,
     });
+    out.editTopicTooLong = await call("PATCH", `/channels/${channelId}`, {
+      topic: "x".repeat(1025),
+    });
+    out.editSlowmodeTooHigh = await call("PATCH", `/channels/${channelId}`, {
+      rate_limit_per_user: 21_601,
+    });
+    // Discovery, Discord only: the kit leaves a reply to an unknown message unmodelled.
+    if (target.name === "discord")
+      out.discoverReplyToUnknownMessage = await call(
+        "POST",
+        `/channels/${channelId}/messages`,
+        {
+          content: "reply",
+          message_reference: { message_id: "1000000000000000000" },
+        },
+      );
+    out.threadNameTooLong = await call(
+      "POST",
+      `/channels/${channelId}/threads`,
+      {
+        name: "x".repeat(101),
+        type: 11,
+      },
+    );
     out.listRoles = await call("GET", `/guilds/${target.guildId}/roles`);
     const card = {
       type: 17,
@@ -324,6 +348,13 @@ export async function runScenarios(
     for (const sound of leftover?.items ?? [])
       if (sound.name === "contract")
         await call("DELETE", `${guild}/soundboard-sounds/${sound.sound_id}`);
+    // Whether Discord trims spaces around a channel name: the mock keeps them (inferred).
+    out.createChannelSpaced = await call("POST", `${guild}/channels`, {
+      name: "  contract-spaced  ",
+      type: 0,
+    });
+    const spacedId = (out.createChannelSpaced.body as { id?: string })?.id;
+    if (spacedId) await call("DELETE", `/channels/${spacedId}`);
     out.createChannelNameTooLong = await call("POST", `${guild}/channels`, {
       name: "x".repeat(101),
       type: 0,
