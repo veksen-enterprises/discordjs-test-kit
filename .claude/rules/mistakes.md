@@ -3,6 +3,8 @@
 Add new lessons at the top, one bullet each: the rule, then the incident in a
 few words.
 
+- **Push only after the whole gate, lint included.** c4553f3 went to `main` gated on the
+  tests alone and failed CI's lint until 3cbec0a (2026-11-23).
 - **Gate the commit on the checks with `&&`.** Running typecheck, lint and tests
   as separate commands then committing lets a failure through. b2b2440 landed on
   `main` with a type error in a test (2026-11-18).
