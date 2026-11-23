@@ -97,6 +97,55 @@ it("lets a member DM the bot and finds the answer in their DMs", async () => {
   expect((await discord.waitForDM(alice, "pong")).content).toBe("pong");
 });
 
+async function fetchedContent(
+  options: Parameters<typeof createDiscord>[0],
+  post: (bot: { id: string }) => string,
+) {
+  const discord = await createDiscord(options);
+  const server = discord.guild("SIN");
+  const general = discord.textChannel(server, "general");
+  const alice = discord.member(server, "alice");
+  const client = new Client({
+    intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages],
+    ...discord.clientOptions,
+  });
+  await discord.start(client);
+  const posted = alice.post(general, { content: post(client.user!) });
+  const channel = await client.channels.fetch(general.id);
+  if (!channel?.isTextBased()) throw new Error("text channel");
+  return (await channel.messages.fetch(posted.id)).content;
+}
+
+it("hides message content from a fetch when the app doesn't have Message Content", async () => {
+  // Act
+  const content = await fetchedContent(
+    { privilegedIntents: [GatewayIntentBits.GuildMembers] },
+    () => "!ping",
+  );
+
+  // Assert
+  expect(content).toBe("");
+});
+
+it("shows a fetched message that mentions the bot, even without Message Content", async () => {
+  // Act
+  const content = await fetchedContent(
+    { privilegedIntents: [] },
+    (bot) => `<@${bot.id}> ping`,
+  );
+
+  // Assert
+  expect(content).toMatch(/ping$/);
+});
+
+it("shows message content to a fetch once the app has Message Content, whatever the bot asked for", async () => {
+  // Act
+  const content = await fetchedContent({}, () => "!ping");
+
+  // Assert
+  expect(content).toBe("!ping");
+});
+
 it("refuses a bot deleting a member's message in their DMs", async () => {
   // Arrange
   const discord = await createDiscord();

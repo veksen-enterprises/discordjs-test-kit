@@ -96,6 +96,8 @@ Each bug was planted in [`examples/challenge/bot.ts`](examples/challenge/bot.ts)
 
 Before a member clicks a button or picks from a select, the kit waits until the bot has been quiet for 100ms, so a bot that starts listening for the click just after replying hears it. A test that clicks 40 times spends 4 seconds waiting. If your bot does nothing between sending a message and listening for its buttons, lower the wait: `createDiscord({ quietTimeMs: 20 })`. Set it too low and a click lands before the bot listens: the test fails with "The application did not respond", though the bot works on Discord. These waits, and the 3-second deadline for answering an interaction, count only time your test could run, so a busy machine that pauses the test doesn't make the bot look late.
 
+If your app hasn't turned on a privileged intent in the Developer Portal, say so: `createDiscord({ privilegedIntents: [GatewayIntentBits.GuildMembers] })`. Without Message Content, the messages your bot reads, including the ones it fetches, arrive without their text, as on Discord.
+
 ## Not modelled yet
 
 - About half of Discord's API: 112 of 228 REST routes and 54 of 79 gateway events. A request the kit doesn't model fails the test and names the route.

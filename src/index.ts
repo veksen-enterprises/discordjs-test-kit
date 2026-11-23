@@ -1,6 +1,7 @@
 import { once } from "node:events";
 import {
   ApplicationCommandPermissionType,
+  GatewayIntentBits,
   type APIMessage,
   type APIUser,
   type RESTPostAPIApplicationCommandsJSONBody,
@@ -1413,7 +1414,27 @@ export interface DiscordOptions {
    * whatever reached the bot to be read.
    */
   quietTimeMs?: number;
+  /**
+   * The privileged intents your app has turned on in the Developer Portal. Default: all three.
+   *
+   * Leave one out to test the bot as it runs without it. Without Message Content, messages the bot
+   * reads arrive with empty content, embeds, attachments and components, over the gateway and when
+   * it fetches them, except in DMs, its own messages and messages that mention it. A bot that
+   * connects asking for an intent left out here is refused, as Discord refuses it.
+   * @example await createDiscord({ privilegedIntents: [GatewayIntentBits.GuildMembers] });
+   */
+  privilegedIntents?: (
+    | GatewayIntentBits.GuildMembers
+    | GatewayIntentBits.GuildPresences
+    | GatewayIntentBits.MessageContent
+  )[];
 }
+
+const PRIVILEGED = [
+  GatewayIntentBits.GuildMembers,
+  GatewayIntentBits.GuildPresences,
+  GatewayIntentBits.MessageContent,
+];
 
 /**
  * A fake Discord for the current test, on its own port, shut down when the test finishes.
@@ -1423,7 +1444,12 @@ export interface DiscordOptions {
 export async function createDiscord(
   options: DiscordOptions = {},
 ): Promise<Discord> {
-  const { quietTimeMs = 100 } = options;
+  const { quietTimeMs = 100, privilegedIntents = PRIVILEGED } = options;
+  const notPrivileged = privilegedIntents.find((i) => !PRIVILEGED.includes(i));
+  if (notPrivileged !== undefined)
+    throw new Error(
+      `discordjs-test-kit: privilegedIntents takes Guild Members, Guild Presences and Message Content only, not ${String(notPrivileged)}`,
+    );
   if (
     typeof quietTimeMs !== "number" ||
     !Number.isFinite(quietTimeMs) ||
@@ -1432,5 +1458,10 @@ export async function createDiscord(
     throw new Error(
       `discordjs-test-kit: quietTimeMs must be a number of milliseconds, 0 or more, not ${String(quietTimeMs)}`,
     );
-  return new Discord(await createDiscordMock(), quietTimeMs);
+  return new Discord(
+    await createDiscordMock({
+      privilegedIntents: privilegedIntents.reduce((all, i) => all | i, 0),
+    }),
+    quietTimeMs,
+  );
 }

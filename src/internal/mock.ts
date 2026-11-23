@@ -2561,7 +2561,7 @@ export class DiscordMock {
             .reverse()
             .slice(0, limit)
             .reverse();
-        return respond.json(list.slice(0, limit));
+        return respond.json(list.slice(0, limit).map((m) => this.readable(m)));
       }),
     );
 
@@ -2647,7 +2647,9 @@ export class DiscordMock {
         const message = this.historyIn(channel).find(
           (m) => m.id === req.params.messageId,
         );
-        return message ? respond.json(message) : respond.unknownMessage();
+        return message
+          ? respond.json(this.readable(message))
+          : respond.unknownMessage();
       }),
     );
 
@@ -3143,6 +3145,33 @@ export class DiscordMock {
   }
 
   /** VIEW_CHANNEL first: without it "other channel permissions are effectively ignored" (docs.discord.food/topics/permissions). */
+  /**
+   * `message` as REST returns it. Without the Message Content intent turned on in the Developer
+   * Portal, Discord empties "fields that expose message content across Discord's APIs"
+   * (events/gateway#message-content-intent), REST included, whatever intents the bot identified
+   * with; DMs, the bot's own messages and messages that mention it keep theirs.
+   */
+  readable(message: APIMessage): APIMessage {
+    if (this.privilegedIntents & GatewayIntentBits.MessageContent)
+      return message;
+    const channel = this.state.channels.get(message.channel_id);
+    const inGuild = !!channel && "guild_id" in channel && !!channel.guild_id;
+    if (
+      !inGuild ||
+      message.author.id === this.state.bot.id ||
+      message.mentions.some((u) => u.id === this.state.bot.id)
+    )
+      return message;
+    return {
+      ...message,
+      content: "",
+      embeds: [],
+      attachments: [],
+      components: [],
+      poll: undefined,
+    };
+  }
+
   /** What the bot holds in the guild, or in the channel's category when it has one. */
   private permissionsToGrant(channel: APIChannel): bigint {
     const guild = this.state.requireGuild(

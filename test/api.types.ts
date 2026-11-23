@@ -1,5 +1,6 @@
 // Type probes for the public API: each line marked @ts-expect-error is a misuse, and `npm run
 // typecheck` fails if it compiles. Never run, only typechecked.
+import { GatewayIntentBits } from "discord.js";
 import { createDiscord, Permission } from "../src/index.js";
 
 const discord = await createDiscord();
@@ -85,3 +86,7 @@ void createDiscord({ quietTimeMs: "50" });
 // A misspelled setting
 // @ts-expect-error
 void createDiscord({ quietMs: 50 });
+
+// An intent that isn't privileged, as an app's portal setting
+// @ts-expect-error
+void createDiscord({ privilegedIntents: [GatewayIntentBits.Guilds] });

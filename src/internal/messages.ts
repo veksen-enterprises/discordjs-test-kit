@@ -92,7 +92,7 @@ export function registerMessageRoutes(
       return respond.json({
         items: pins.slice(0, limit).map((m) => ({
           pinned_at: pinnedAt.get(m.id)!,
-          message: withoutReactions(m),
+          message: mock.readable(withoutReactions(m)),
         })),
         has_more: pins.length > limit,
       });
@@ -108,7 +108,11 @@ export function registerMessageRoutes(
       if (!channel) return respond.unknownChannel();
       const denied = mock.checkBotPerms(channel, Permission.ReadMessageHistory);
       if (denied) return denied;
-      return respond.json(pinsIn(channel).slice(0, 50).map(withoutReactions));
+      return respond.json(
+        pinsIn(channel)
+          .slice(0, 50)
+          .map((m) => mock.readable(withoutReactions(m))),
+      );
     }),
   );
 
