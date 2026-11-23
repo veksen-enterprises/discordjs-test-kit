@@ -98,15 +98,19 @@ Before a member runs a command, clicks a button or picks from a select, the kit 
 
 If your app hasn't turned on a privileged intent in the Developer Portal, say so: `createDiscord({ privilegedIntents: [GatewayIntentBits.GuildMembers] })`. Without Message Content, the messages your bot reads, including the ones it fetches, arrive without their text, as on Discord.
 
-## Not modelled yet
+## Discord API coverage
 
-- About half of Discord's API: 112 of 228 REST routes and 54 of 79 gateway events. A request the kit doesn't model fails the test and names the route.
-- Gateway compression. If `zlib-sync` is installed, discord.js asks for it and the bot reconnects in a loop until the test times out.
-- Partials, and form fields other than text inputs.
+The share of Discord's API the kit's tests reach at each release, counting the REST routes a bot can call and the gateway events. If your bot calls a route the kit doesn't model, the test fails and names the route. [What's missing](site/src/content/docs/reference/missing.md) lists the rest.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/img/coverage-dark.svg">
+  <img alt="Coverage by release. REST routes: 93 of 213 at 0.1.0, 155 at 0.4.0, 165 at 0.6.0. Gateway events: 51 of 79 at 0.1.0, 63 at 0.4.0, 64 at 0.6.0." src="docs/img/coverage-light.svg">
+</picture>
 
 ## Docs
 
 - [Every action](site/src/content/docs/reference/actions.md) a test can take, with what it returns
 - [Discord rules the kit enforces](site/src/content/docs/reference/discord-rules.md), by area
+- [What's missing](site/src/content/docs/reference/missing.md) from Discord's API, by area and route by route
 - [Discord failing](site/src/content/docs/recipes/discord-failing.mdx): 5xx, rate limits, lost sessions
 - [Testing guide](skills/discordjs-test-kit/SKILL.md): the skill agents read
