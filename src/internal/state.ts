@@ -176,9 +176,12 @@ export class DiscordState extends EventEmitter<{
 
   createGuild(input: { name: string; ownerId?: string }): GuildRecord {
     const id = snowflake();
-    const everyone: APIRole = {
+    // Every role is copied from @everyone. Discord sends `description` on roles (the contract run
+    // saw it); discord-api-types doesn't list it yet.
+    const everyone: APIRole & { description: string | null } = {
       id,
       name: "@everyone",
+      description: null,
       color: 0,
       colors: { primary_color: 0, secondary_color: null, tertiary_color: null },
       hoist: false,

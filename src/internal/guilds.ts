@@ -160,6 +160,8 @@ export function registerGuildRoutes(
         discovery_splash,
         features,
         description: null,
+        // docs.discord.food's partial guild: "home_header?: ?string"; the contract run got null.
+        home_header: null,
         emojis: [...guild.emojis.values()].map(strip),
         stickers: [...guild.stickers.values()].map(strip),
         approximate_member_count: guild.members.size,

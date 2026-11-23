@@ -137,6 +137,9 @@ export function createScheduledEvent(
       "location" in input.place ? { location: input.place.location } : null,
     image: null,
     recurrence_rule: null,
+    // Sent by Discord on every event (contract run 45099526148); not in discord-api-types.
+    sku_ids: [],
+    guild_scheduled_event_exceptions: [],
   } as APIGuildScheduledEvent;
   addEvent(mock, guild, user.id, event);
   return event;
@@ -426,6 +429,8 @@ export function registerScheduledEventRoutes(
         entity_metadata: external ? { location } : null,
         image: body.image != null ? coverHash() : null,
         recurrence_rule: null,
+        sku_ids: [],
+        guild_scheduled_event_exceptions: [],
       } as APIGuildScheduledEvent;
       addEvent(mock, guild, state.bot.id, event, reasonOf(req));
       return respond.json(event);
