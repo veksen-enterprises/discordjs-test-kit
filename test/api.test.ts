@@ -97,6 +97,58 @@ it("lets a member DM the bot and finds the answer in their DMs", async () => {
   expect((await discord.waitForDM(alice, "pong")).content).toBe("pong");
 });
 
+async function startTicketBot() {
+  const discord = await createDiscord();
+  const server = discord.guild("SIN");
+  const general = discord.textChannel(server, "general");
+  const alice = discord.member(server, "alice");
+  const client = new Client({
+    intents: [GatewayIntentBits.Guilds],
+    ...discord.clientOptions,
+  });
+  client.on(Events.InteractionCreate, async (interaction) => {
+    if (!interaction.isChatInputCommand() || !interaction.inCachedGuild())
+      return;
+    const ticket = await interaction.guild.channels.create({
+      name: `ticket-${interaction.user.username}`,
+    });
+    await ticket.send(`Welcome ${interaction.user.username}`);
+    await interaction.reply({ content: `Opened ${ticket}`, ephemeral: true });
+  });
+  await discord.start(client, {
+    commands: [{ name: "ticket", description: "Open a ticket" }],
+    permissions: Permission.ManageChannels | Permission.SendMessages,
+  });
+  return { discord, server, general, alice };
+}
+
+it("finds the text channel the bot creates, by name", async () => {
+  // Arrange
+  const { discord, server, general, alice } = await startTicketBot();
+  await alice.runCommand(general, "ticket");
+
+  // Act
+  const ticket = await discord.waitForTextChannel(server, "ticket-alice");
+
+  // Assert
+  expect((await discord.waitForMessage(ticket, /Welcome/)).content).toBe(
+    "Welcome alice",
+  );
+});
+
+it("names the server's text channels when none matches", async () => {
+  // Arrange
+  const { discord, server } = await startTicketBot();
+
+  // Act
+  const ticket = discord.waitForTextChannel(server, "ticket-bob");
+
+  // Assert
+  await expect(ticket).rejects.toThrow(
+    'no text channel in SIN matched "ticket-bob" within 2s. Text channels there: #general',
+  );
+});
+
 async function fetchedContent(
   options: Parameters<typeof createDiscord>[0],
   post: (bot: { id: string }) => string,

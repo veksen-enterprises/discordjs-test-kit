@@ -90,3 +90,8 @@ void createDiscord({ quietMs: 50 });
 // An intent that isn't privileged, as an app's portal setting
 // @ts-expect-error
 void createDiscord({ privilegedIntents: [GatewayIntentBits.Guilds] });
+
+// A channel the bot made in another server, used by this server's member
+const ticket = await discord.waitForTextChannel(otherServer, "ticket");
+// @ts-expect-error
+void alice.post(ticket, { content: "hi" });

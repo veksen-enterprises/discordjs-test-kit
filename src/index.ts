@@ -1,6 +1,7 @@
 import { once } from "node:events";
 import {
   ApplicationCommandPermissionType,
+  ChannelType,
   GatewayIntentBits,
   type APIMessage,
   type APIUser,
@@ -779,6 +780,37 @@ class Discord {
       const names = threads().map((t) => `"${t.name}"`);
       throw new Error(
         `discordjs-test-kit: no thread in #${channel.name} matched ${quote(name)} within ${FIND_TIMEOUT_MS / 1000}s. ${names.length ? `Threads there: ${names.join(", ")}` : "It has no threads"}`,
+      );
+    }
+    return handle(found.id, found.name ?? "");
+  }
+
+  /**
+   * Waits for a text channel in `guild` whose name contains `name` (or matches it when it's a
+   * RegExp), such as one the bot creates for a ticket. Resolves with the newest match; rejects after
+   * 2 seconds, naming the server's text channels.
+   * @example await alice.click(panel, "Open ticket"); const ticket = await discord.waitForTextChannel(server, "ticket-alice");
+   */
+  async waitForTextChannel<G extends string>(
+    guild: Guild<G>,
+    name: string | RegExp,
+  ): Promise<TextChannel<G>> {
+    const record = this.g(guild);
+    const textChannels = () =>
+      record.channelIds
+        .map((id) => this.mock.state.requireChannel(id))
+        .filter((c) => c.type === ChannelType.GuildText);
+    const find = () =>
+      textChannels().findLast((c) =>
+        matches(c.name ?? "", name, { partial: true }),
+      );
+    const found = await this.mock
+      .waitForChannel(find, { timeoutMs: FIND_TIMEOUT_MS })
+      .catch(() => undefined);
+    if (!found) {
+      const names = textChannels().map((c) => `#${c.name}`);
+      throw new Error(
+        `discordjs-test-kit: no text channel in ${record.name} matched ${quote(name)} within ${FIND_TIMEOUT_MS / 1000}s. ${names.length ? `Text channels there: ${names.join(", ")}` : "It has no text channels"}`,
       );
     }
     return handle(found.id, found.name ?? "");

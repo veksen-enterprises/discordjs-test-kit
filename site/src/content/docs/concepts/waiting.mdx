@@ -40,7 +40,7 @@ Lower it only when the bot does nothing between sending a message and listening 
 
 ## Threads and sound
 
-`waitForThread(channel, name)` waits for a thread the bot starts in `channel`, by name. `waitForThreadFrom(message)` waits for the thread the bot starts from `message`, whatever it names it. `waitForSound(channel)` waits for the bot to play sound in a voice or stage channel. Each gives up after 2 seconds.
+`waitForThread(channel, name)` waits for a thread the bot starts in `channel`, by name. `waitForThreadFrom(message)` waits for the thread the bot starts from `message`, whatever it names it. `waitForTextChannel(server, name)` waits for a text channel in the server, by name, such as a ticket channel the bot opens. `waitForSound(channel)` waits for the bot to play sound in a voice or stage channel. Each gives up after 2 seconds.
 
 ## Anything else
 

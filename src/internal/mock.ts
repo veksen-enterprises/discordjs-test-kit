@@ -914,6 +914,35 @@ export class DiscordMock {
     return this.waitForState(["threadCreate"], predicate, opts.timeoutMs);
   }
 
+  /**
+   * Resolves with the first channel `find` returns, checked now and after every request the bot
+   * makes or dispatch it's sent (a channel the bot creates appears through its own request).
+   */
+  waitForChannel(
+    find: () => APIChannel | undefined,
+    opts: { timeoutMs?: number } = {},
+  ): Promise<APIChannel> {
+    const now = find();
+    if (now) return Promise.resolve(now);
+    return new Promise((resolve, reject) => {
+      const check = () => {
+        const found = find();
+        if (!found) return;
+        cleanup();
+        resolve(found);
+      };
+      const timer = runnable.setTimeout(() => {
+        cleanup();
+        reject(new Error("discordjs-test-kit: no match"));
+      }, opts.timeoutMs ?? 2_000);
+      const cleanup = () => {
+        runnable.clearTimeout(timer);
+        this.activity.off("change", check);
+      };
+      this.activity.on("change", check);
+    });
+  }
+
   private waitForState<T extends APIMessage | APIChannel>(
     events: ("messageCreate" | "messageUpdate" | "threadCreate")[],
     predicate: (value: T) => boolean,
