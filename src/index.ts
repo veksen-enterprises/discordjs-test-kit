@@ -1,6 +1,7 @@
 import { once } from "node:events";
 import {
   ApplicationCommandPermissionType,
+  AuditLogEvent,
   ChannelType,
   GatewayIntentBits,
   type APIMessage,
@@ -10,6 +11,7 @@ import {
 import type { Client } from "discord.js";
 import { onTestFinished } from "vitest";
 import { hookCollectors, skip } from "./internal/clock.js";
+import { recordAudit } from "./internal/audit.js";
 import { setCommandPermissions } from "./internal/command-permissions.js";
 import {
   deleteExpression,
@@ -471,7 +473,8 @@ class Discord {
    * them roles made with `discord.role`, for a bot that checks roles by name. `invite` is the
    * code they join through, from `member.createInvite`: its uses go up, as invite trackers expect.
    * `inactiveDays` is how long since Discord last saw them, for prune; everyone else was seen now.
-   * `bot: true` makes another bot, whose posts carry `author.bot`.
+   * `bot: true` makes another bot, whose posts carry `author.bot`; the audit log shows it added by
+   * `addedBy`, the server's owner unless you say.
    * @example const alice = discord.member(server, "Alice");
    * @example const mod = discord.member(server, "Mod", { permissions: Permission.ModerateMembers });
    * @example const carol = discord.member(server, "Carol", { invite: alice.createInvite(general) });
@@ -487,6 +490,7 @@ class Discord {
       invite?: string;
       inactiveDays?: number;
       bot?: boolean;
+      addedBy?: Member<NoInfer<G>>;
     } = {},
   ): Member<G> {
     const user = this.mock.createUser(name, { bot: options.bot });
@@ -501,6 +505,13 @@ class Discord {
       this.mock.createRole(record, `${name}'s role`, options.permissions, [
         user,
       ]);
+    // audit-log events: BOT_ADD (28), "Bot user was added to server", by whoever authorized it.
+    if (options.bot)
+      recordAudit(this.mock, record, {
+        action_type: AuditLogEvent.BotAdd,
+        user_id: options.addedBy?.id ?? record.ownerId,
+        target_id: user.id,
+      });
     for (const role of options.roles ?? [])
       this.mock.giveRole(record, user, role.id);
     if (options.inactiveDays !== undefined)
@@ -1306,7 +1317,7 @@ class MemberActor {
         `discordjs-test-kit: ${this.name} can't rename ${guild.name} without Manage Server`,
       );
     this.markAction();
-    this.mock.renameGuild(guild, name);
+    this.mock.renameGuild(guild, name, this.id);
   }
 
   createEvent(

@@ -1,5 +1,6 @@
 import {
   ActionRowBuilder,
+  AuditLogEvent,
   Client,
   Events,
   GatewayIntentBits,
@@ -165,6 +166,35 @@ it("refuses a bot that logged in with another token", async () => {
 
   // Assert
   await expect(started).rejects.toThrow("a token that isn't discord.token");
+});
+
+it("logs who added another bot to the server", async () => {
+  // Arrange
+  const discord = await createDiscord();
+  const server = discord.guild("SIN");
+  const admin = discord.member(server, "admin", {
+    permissions: Permission.ManageGuild,
+  });
+  const client = new Client({
+    intents: [GatewayIntentBits.Guilds],
+    ...discord.clientOptions,
+  });
+  await discord.start(client, { permissions: Permission.ViewAuditLog });
+
+  // Act
+  const other = discord.member(server, "Other Bot", {
+    bot: true,
+    addedBy: admin,
+  });
+
+  // Assert
+  const log = await client.guilds.cache
+    .get(server.id)!
+    .fetchAuditLogs({ type: AuditLogEvent.BotAdd });
+  expect([
+    log.entries.first()?.executorId,
+    log.entries.first()?.targetId,
+  ]).toEqual([admin.id, other.id]);
 });
 
 async function startRoleCheckBot() {

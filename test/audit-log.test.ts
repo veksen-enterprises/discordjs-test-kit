@@ -71,6 +71,23 @@ it("names the moderator who kicked a member, in the log and as it happens", asyn
   mock.assertNoUnhandledRequests();
 });
 
+it("logs who renamed the server, with the old and new name", async () => {
+  // Arrange
+  const { guild, cached } = await start(Permission.ViewAuditLog);
+  const owner = mock.state.requireUser(guild.ownerId);
+
+  // Act
+  mock.renameGuild(guild, "Titan", owner.id);
+
+  // Assert
+  const log = await cached.fetchAuditLogs({ type: AuditLogEvent.GuildUpdate });
+  const entry = log.entries.first();
+  expect([entry?.executorId, entry?.changes]).toEqual([
+    owner.id,
+    [{ key: "name", old: "g", new: "Titan" }],
+  ]);
+});
+
 it("logs the bot's own actions with their reason, newest first", async () => {
   const { alice, cached } = await start(
     Permission.ViewAuditLog |

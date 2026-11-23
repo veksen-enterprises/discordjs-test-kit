@@ -86,7 +86,7 @@ export function registerGuildRoutes(
         // Which errors entry Discord gives is unchecked; the code is Invalid Form Body.
         if (name.length < 2 || name.length > 100)
           return respond.invalidFormBody();
-        mock.renameGuild(guild, name);
+        mock.renameGuild(guild, name, bot);
       }
       return respond.json(guildPayload(guild));
     }),

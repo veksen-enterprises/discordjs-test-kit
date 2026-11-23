@@ -620,9 +620,20 @@ export class DiscordMock {
     }
   }
 
-  /** `guild` is renamed; a bot in it hears GUILD_UPDATE with the guild (gateway-events#guild-update). */
-  renameGuild(guild: GuildRecord, name: string) {
+  /**
+   * `executorId` renames `guild`; a bot in it hears GUILD_UPDATE with the guild
+   * (gateway-events#guild-update), and the audit log gets a GUILD_UPDATE entry (audit-log events: "Server
+   * settings were updated") with the name change.
+   */
+  renameGuild(guild: GuildRecord, name: string, executorId: string) {
+    const before = guild.name;
     guild.name = name;
+    recordAudit(this, guild, {
+      action_type: AuditLogEvent.GuildUpdate,
+      user_id: executorId,
+      target_id: guild.id,
+      changes: [{ key: "name", old_value: before, new_value: name }],
+    });
     if (this.state.botIn(guild.id))
       this.gateway.dispatch(
         GatewayDispatchEvents.GuildUpdate,

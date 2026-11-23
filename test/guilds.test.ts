@@ -80,7 +80,7 @@ it("tells the bot when someone else renames the guild", async () => {
   await login();
   const updated = once(client, Events.GuildUpdate);
 
-  mock.renameGuild(guild, "new");
+  mock.renameGuild(guild, "new", guild.ownerId);
 
   expect((await updated)[1].name).toBe("new");
 });

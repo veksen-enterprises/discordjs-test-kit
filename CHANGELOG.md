@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- `discord.member(server, name, { bot: true, addedBy })` logs a BOT_ADD audit entry by `addedBy` (the owner by default), and renaming the server logs GUILD_UPDATE with the old and new name.
 - A reply to a message that isn't in the channel is refused with Invalid Form Body (50035), naming `message_reference`, as Discord does; it used to fail the test as unsupported. Channel names lose the spaces around them, as on Discord.
 - Fixed: about one voice connection in 200 failed with an unmodelled "PEM routines::ASN1 lib" error, because the fake voice server's certificate sometimes had an invalid serial number.
 - Running a command waits up to 2 seconds for a bot that hasn't registered any commands yet, so a bot that deploys its commands while it starts doesn't fail the first command. With commands already registered, a wrong name still fails at once.
