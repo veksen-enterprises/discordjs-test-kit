@@ -231,6 +231,39 @@ export async function runScenarios(
         { messages: [ids[0], ids[0], ids[1]] },
       );
     }
+    // Discovery, Discord only: whether a poll message's components can be edited (520003?).
+    if (target.name === "discord") {
+      const poll = await call("POST", `/channels/${channelId}/messages`, {
+        poll: {
+          question: { text: "contract?" },
+          answers: [
+            { poll_media: { text: "a" } },
+            { poll_media: { text: "b" } },
+          ],
+          duration: 1,
+        },
+        components: [
+          {
+            type: 1,
+            components: [{ type: 2, style: 1, label: "End", custom_id: "end" }],
+          },
+        ],
+      });
+      out.discoverPollWithButton = poll;
+      const pollId = (poll.body as { id?: string })?.id;
+      if (pollId) {
+        out.discoverPollRemoveButtons = await call(
+          "PATCH",
+          `/channels/${channelId}/messages/${pollId}`,
+          { components: [] },
+        );
+        out.discoverPollEditContent = await call(
+          "PATCH",
+          `/channels/${channelId}/messages/${pollId}`,
+          { content: "edited" },
+        );
+      }
+    }
     out.sendButtons = await call("POST", `/channels/${channelId}/messages`, {
       content: "buttons",
       components: [
