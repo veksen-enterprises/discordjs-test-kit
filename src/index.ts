@@ -455,7 +455,11 @@ class Discord {
     return handle(this.mock.createStageChannel(this.g(guild), name).id, name);
   }
 
-  /** A role in `guild` with no permissions, for members to pick in a role select. */
+  /**
+   * A role in `guild` with no permissions, for members to pick in a role select or to give with
+   * `member(…, { roles })`. Roles stack in the order you make them, each above the last, so make one
+   * the bot must hand out before `start`: the bot's own role then sits above it.
+   */
   role<G extends string>(guild: Guild<G>, name: string): Role<G> {
     return handle(this.mock.createRole(this.g(guild), name, 0n).id, name);
   }
