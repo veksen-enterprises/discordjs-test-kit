@@ -361,6 +361,29 @@ it("sets the bot's own nickname with Change Nickname", async () => {
   expect(record.members.get(client.user!.id)?.nick).toBe("Ladder Bot");
 });
 
+it("tells the bot about its own nickname change without the Guild Members intent", async () => {
+  // Arrange
+  const record = mock.createGuild("g");
+  mock.grantBot(Permission.ChangeNickname);
+  client = new Client({
+    intents: [GatewayIntentBits.Guilds],
+    ...mock.clientOptions,
+  });
+  const ready = once(client, Events.ClientReady);
+  await client.login(mock.token);
+  await ready;
+  const updated = once(client, Events.GuildMemberUpdate);
+
+  // Act
+  await client.guilds.cache
+    .get(record.id)!
+    .members.me!.setNickname("Ladder Bot");
+
+  // Assert
+  const [, after] = await updated;
+  expect(after.nickname).toBe("Ladder Bot");
+});
+
 it("fetches a user who isn't cached", async () => {
   // Arrange
   const { alice } = await start(0n);

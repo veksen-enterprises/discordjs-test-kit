@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- The bot hears `guildMemberUpdate` for its own nickname change without the Guild Members intent, as on Discord. Uploading a soundboard sound answers 201, and an emoji upload's answer leaves out `user`, as Discord's do.
 - Typing where the bot can't send messages is refused with Missing Access (50001), and an invite lasting over 7 days with Invalid Form Body (50035), as the test guild answered. Both used to fail the test as unsupported.
 - New `discord.waitForTextChannel(server, name)`: a handle for a text channel the bot creates, such as a ticket channel, so a test can post in it and read what the bot sends there.
 - Polls: the bot can edit a poll message's text and remove its buttons; the poll stays, as on Discord. It used to fail the test as unsupported.

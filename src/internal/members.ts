@@ -61,11 +61,15 @@ export function registerMemberRoutes(
   const outranks = (guild: GuildRecord, targetId: string) =>
     targetId !== guild.ownerId &&
     (guild.ownerId === bot || highest(guild, bot) > highest(guild, targetId));
+  // The bot's own member update reaches it without GUILD_MEMBERS: the contract run got one, on
+  // the Guilds intent alone, when the bot changed its nickname.
   const announceUpdate = (guild: GuildRecord, member: APIGuildMember) =>
     gateway.dispatch(
       GatewayDispatchEvents.GuildMemberUpdate,
       { ...member, guild_id: guild.id },
-      GatewayIntentBits.GuildMembers,
+      member.user.id === bot
+        ? GatewayIntentBits.Guilds
+        : GatewayIntentBits.GuildMembers,
     );
 
   // docs.discord.food/resources/guild#leave-guild: 204. An owner can't leave without handing the

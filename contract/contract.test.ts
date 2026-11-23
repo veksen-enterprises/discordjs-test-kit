@@ -101,7 +101,7 @@ describe("scenarios against the mock", () => {
       createChannelNameTooLong: 400,
       createEmoji: 201,
       deleteEmoji: 204,
-      createSound: 200,
+      createSound: 201,
       deleteSound: 204,
       setOwnNickname: 200,
       typingWithoutSend: 403,

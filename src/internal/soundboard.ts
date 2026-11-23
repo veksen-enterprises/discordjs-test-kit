@@ -149,7 +149,8 @@ export function registerSoundboardRoutes(
         changes: [{ key: "name", new_value: body.name as string }],
         reason: reasonOf(req),
       });
-      return respond.json(shown(guild, id));
+      // 201, as the contract run got from the test guild.
+      return respond.json(shown(guild, id), 201);
     }),
   );
 
