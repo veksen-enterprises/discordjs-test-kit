@@ -250,16 +250,16 @@ export async function runScenarios(
         ],
       });
       out.discoverPollWithButton = poll;
-      const pollId = (poll.body as { id?: string })?.id;
-      if (pollId) {
+      const discoveredPollId = (poll.body as { id?: string })?.id;
+      if (discoveredPollId) {
         out.discoverPollRemoveButtons = await call(
           "PATCH",
-          `/channels/${channelId}/messages/${pollId}`,
+          `/channels/${channelId}/messages/${discoveredPollId}`,
           { components: [] },
         );
         out.discoverPollEditContent = await call(
           "PATCH",
-          `/channels/${channelId}/messages/${pollId}`,
+          `/channels/${channelId}/messages/${discoveredPollId}`,
           { content: "edited" },
         );
       }
