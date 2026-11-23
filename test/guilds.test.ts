@@ -207,3 +207,17 @@ it("previews a guild the bot is in, with its member and online counts", async ()
     online: preview.approximatePresenceCount,
   }).toEqual({ name: "Titan", members: record.members.size, online: 1 });
 });
+
+it("trims the spaces around a channel name the bot gives, as Discord does", async () => {
+  // Arrange
+  const record = mock.createGuild("g");
+  mock.grantBot(Permission.ManageChannels);
+  await login();
+  const guild = client.guilds.cache.get(record.id)!;
+
+  // Act
+  const channel = await guild.channels.create({ name: "  welcome  " });
+
+  // Assert
+  expect(channel.name).toBe("welcome");
+});

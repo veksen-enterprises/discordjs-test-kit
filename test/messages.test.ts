@@ -135,6 +135,31 @@ it("refuses a bulk delete with a message over two weeks old, or too few ids", as
   ).toBe(50035);
 });
 
+it("refuses a reply to a message that isn't in the channel, naming the reference", async () => {
+  // Arrange
+  const { channel } = await start(
+    Permission.SendMessages | Permission.ReadMessageHistory,
+  );
+
+  // Act
+  const sent = channel.send({
+    content: "reply",
+    reply: { messageReference: "1000000000000000000", failIfNotExists: true },
+  });
+
+  // Assert
+  await expect(sent).rejects.toMatchObject({
+    code: 50035,
+    rawError: {
+      errors: {
+        message_reference: {
+          _errors: [{ code: "MESSAGE_REFERENCE_UNKNOWN_MESSAGE" }],
+        },
+      },
+    },
+  });
+});
+
 it("refuses to list who reacted without Read Message History, with Missing Access", async () => {
   // Arrange
   const { general, channel, alice } = await start(

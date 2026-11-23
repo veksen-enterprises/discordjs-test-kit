@@ -301,3 +301,25 @@ function countComponents(components: NestedComponent[]): number {
     0,
   );
 }
+
+/** A reply to a message that isn't in the channel, as the contract run got it from the test guild. */
+export function unknownReplyError(): RestResponse {
+  return {
+    status: 400,
+    body: {
+      message: "Invalid Form Body",
+      code: 50035,
+      errors: {
+        message_reference: {
+          // oxlint-disable-next-line no-underscore-dangle -- Discord's error body names it `_errors`
+          _errors: [
+            {
+              code: "MESSAGE_REFERENCE_UNKNOWN_MESSAGE",
+              message: "Unknown message",
+            },
+          ],
+        },
+      },
+    },
+  };
+}

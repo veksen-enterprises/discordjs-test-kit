@@ -50,6 +50,7 @@ import {
   choicesLimitError,
   messageLimitError,
   modalLimitError,
+  unknownReplyError,
 } from "./limits.js";
 import { banUser, kickMember, registerMemberRoutes } from "./members.js";
 import { registerMessageRoutes } from "./messages.js";
@@ -2229,6 +2230,9 @@ export class DiscordMock {
         if (!(perms & Permission.ManageChannels))
           return respond.missingPermissions();
         if (typeof body.name !== "string") return respond.invalidFormBody();
+        // Discord trims the name: the contract run's "  contract-spaced  " came back without spaces.
+        body.name = body.name.trim();
+        if (typeof body.name === "string") body.name = body.name.trim();
         const invalid = channelEditError(body);
         if (invalid) return invalid;
         const parent =
@@ -2258,7 +2262,7 @@ export class DiscordMock {
           );
         });
         if (refused) return respond.missingPermissions();
-        const name = body.name;
+        const name = body.name as string;
         const channel =
           type === ChannelType.GuildText
             ? state.createTextChannel(guild.id, { name })
@@ -2515,7 +2519,7 @@ export class DiscordMock {
         );
         if (denied) return denied;
         if (replyTo && !this.historyIn(channel).some((m) => m.id === replyTo))
-          return rest.gap(`reply to unknown message ${replyTo}`);
+          return unknownReplyError();
         const overLimit = messageLimitError(body);
         if (overLimit) return overLimit;
         // A user who turned off DMs from server members can't be messaged: 50007 "Cannot send
