@@ -259,7 +259,7 @@ export async function runScenarios(
     out.channelPositions = await call("PATCH", `${guild}/channels`, [
       { id: channelId, position: 0 },
     ]);
-    // The invite has no Create Events; whether @everyone grants it is what this checks.
+    // The invite has no Create Events, but the test guild's @everyone grants it.
     const start = new Date(Date.now() + 86_400_000).toISOString();
     out.createScheduledEvent = await call("POST", `${guild}/scheduled-events`, {
       name: "contract event",

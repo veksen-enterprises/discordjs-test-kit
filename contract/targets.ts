@@ -67,13 +67,14 @@ export async function mockTarget(): Promise<Target> {
   // The test guild's @everyone lets the bot start public threads: run 7 got 201 for a thread the
   // invite doesn't grant. The mock's @everyone is narrower, so the bot gets it here.
   // Create Invite and Send Polls are in a new server's @everyone too (inferred; the contract's
-  // createInvite and sendPoll check them).
+  // createInvite and sendPoll check them). So is Create Events: run 45099526148 created an event.
   mock.createRole(
     guild,
     "everyone-extras",
     Permission.CreatePublicThreads |
       Permission.CreateInstantInvite |
-      Permission.SendPolls,
+      Permission.SendPolls |
+      Permission.CreateEvents,
     [mock.state.bot],
   );
   const dispatches: Target["dispatches"] = [];
