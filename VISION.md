@@ -78,6 +78,7 @@ They pull against each other. When they conflict, name the trade-off.
   discord.js-only?
 - **Time.** The 3s interaction deadline and `Retry-After` use the real clock.
   Do we support fake timers, or keep real time with short configurable
-  durations?
+  durations? The kit's own waits now count time the process could run
+  (ADR 0007); fake timers for the bot stay open.
 - **Test-runner helpers.** Vitest matchers (`expect(channel).toHaveMessage(...)`)
   in this package, or none?

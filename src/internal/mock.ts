@@ -67,6 +67,7 @@ import {
   type RestHandler,
   type RestRequest,
 } from "./rest.js";
+import { runnable } from "./runnable-clock.js";
 import { registerScheduledEventRoutes } from "./scheduled-events.js";
 import { snowflake } from "./snowflake.js";
 import { registerSoundboardRoutes } from "./soundboard.js";
@@ -92,8 +93,6 @@ export { Permission } from "./payloads.js";
 
 // Captured at import, before a test can fake timers: a wait must still time out after a test
 // calls vi.useFakeTimers() to move the bot's clock.
-const realSetTimeout = globalThis.setTimeout;
-const realClearTimeout = globalThis.clearTimeout;
 const realSetImmediate = globalThis.setImmediate;
 
 /** What a user posts: text, files, and the message it replies to. */
@@ -158,7 +157,7 @@ export class InteractionRun extends EventEmitter<{ change: [] }> {
   readonly followups: APIMessage[] = [];
   /** The bot deleted its reply (DELETE @original). */
   replyDeleted = false;
-  readonly createdAt = Date.now();
+  readonly createdAt = runnable.now();
 
   constructor(
     private mock: DiscordMock,
@@ -191,7 +190,7 @@ export class InteractionRun extends EventEmitter<{ change: [] }> {
         cleanup();
         resolve(this);
       };
-      const timer = realSetTimeout(() => {
+      const timer = runnable.setTimeout(() => {
         cleanup();
         reject(
           new Error(
@@ -200,7 +199,7 @@ export class InteractionRun extends EventEmitter<{ change: [] }> {
         );
       }, timeoutMs);
       const cleanup = () => {
-        realClearTimeout(timer);
+        runnable.clearTimeout(timer);
         this.off("change", check);
       };
       this.on("change", check);
@@ -221,8 +220,8 @@ export class InteractionRun extends EventEmitter<{ change: [] }> {
     quietMs = whenQuiet === "fail" ? 2_000 : 100,
   ): Promise<this> {
     return new Promise((resolve, reject) => {
-      let timer: ReturnType<typeof setTimeout> | undefined;
-      const busy = realSetTimeout(() => {
+      let timer: ReturnType<typeof runnable.setTimeout> | undefined;
+      const busy = runnable.setTimeout(() => {
         cleanup();
         const latest = this.mock.rest.log
           .slice(-3)
@@ -235,8 +234,8 @@ export class InteractionRun extends EventEmitter<{ change: [] }> {
         );
       }, MAX_BUSY_WAIT_MS);
       const arm = () => {
-        realClearTimeout(timer);
-        timer = realSetTimeout(() => {
+        runnable.clearTimeout(timer);
+        timer = runnable.setTimeout(() => {
           cleanup();
           if (whenQuiet === "settle") return resolve(this);
           reject(
@@ -253,8 +252,8 @@ export class InteractionRun extends EventEmitter<{ change: [] }> {
         resolve(this);
       };
       const cleanup = () => {
-        realClearTimeout(timer);
-        realClearTimeout(busy);
+        runnable.clearTimeout(timer);
+        runnable.clearTimeout(busy);
         this.off("change", check);
         this.mock.activity.off("change", arm);
       };
@@ -345,6 +344,9 @@ export class DiscordMock {
   readonly privilegedIntents: number;
   apiUrl = "";
 
+  /** Keeps the runnable clock advancing while this mock is open, for interaction deadlines. */
+  private readonly releaseClock = runnable.hold();
+
   constructor(options: DiscordMockOptions = {}) {
     this.interactionDeadlineMs = options.interactionDeadlineMs ?? 3_000;
     this.privilegedIntents =
@@ -396,6 +398,7 @@ export class DiscordMock {
   }
 
   async close() {
+    this.releaseClock();
     this.voiceServer.close();
     this.gateway.close();
     this.server.closeAllConnections();
@@ -849,7 +852,7 @@ export class DiscordMock {
   ): Promise<void> {
     const { quietMs = 100, timeoutMs = 2_000 } = opts;
     return new Promise((resolve, reject) => {
-      let quiet: ReturnType<typeof setTimeout> | undefined;
+      let quiet: ReturnType<typeof runnable.setTimeout> | undefined;
       // Bumped by every change, so a confirmation started before it no longer counts.
       let generation = 0;
       const confirm = (turns: number, started: number) => {
@@ -862,17 +865,17 @@ export class DiscordMock {
       };
       const restart = () => {
         generation++;
-        realClearTimeout(quiet);
+        runnable.clearTimeout(quiet);
         const started = generation;
         quiet =
           this.inFlight === 0
-            ? realSetTimeout(
+            ? runnable.setTimeout(
                 () => confirm(QUIET_CONFIRM_TURNS, started),
                 quietMs,
               )
             : undefined;
       };
-      const deadline = realSetTimeout(() => {
+      const deadline = runnable.setTimeout(() => {
         cleanup();
         reject(
           new Error(
@@ -882,8 +885,8 @@ export class DiscordMock {
       }, timeoutMs);
       const cleanup = () => {
         generation++;
-        realClearTimeout(quiet);
-        realClearTimeout(deadline);
+        runnable.clearTimeout(quiet);
+        runnable.clearTimeout(deadline);
         this.activity.off("change", restart);
       };
       this.activity.on("change", restart);
@@ -922,7 +925,7 @@ export class DiscordMock {
         cleanup();
         resolve(value);
       };
-      const timer = realSetTimeout(() => {
+      const timer = runnable.setTimeout(() => {
         cleanup();
         reject(new Error(`discordjs-test-kit: no match within ${timeoutMs}ms`));
       }, timeoutMs);
@@ -932,7 +935,7 @@ export class DiscordMock {
       ) => void;
       const off = this.state.off.bind(this.state) as typeof on;
       const cleanup = () => {
-        realClearTimeout(timer);
+        runnable.clearTimeout(timer);
         for (const event of events) off(event, listener);
       };
       for (const event of events) on(event, listener);
@@ -2845,7 +2848,7 @@ export class DiscordMock {
       if (!run || run.token !== req.params.token)
         return respond.unknownInteraction();
       if (run.state !== "pending") return respond.alreadyAcknowledged();
-      if (Date.now() - run.createdAt > this.interactionDeadlineMs)
+      if (runnable.now() - run.createdAt > this.interactionDeadlineMs)
         return respond.unknownInteraction();
 
       const body = req.body as RESTPostAPIInteractionCallbackJSONBody;

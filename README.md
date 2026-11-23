@@ -94,7 +94,7 @@ Each bug was planted in [`examples/challenge/bot.ts`](examples/challenge/bot.ts)
 
 ## Clicks and selects wait for the bot
 
-Before a member clicks a button or picks from a select, the kit waits until the bot has been quiet for 100ms, so a bot that starts listening for the click just after replying hears it. A test that clicks 40 times spends 4 seconds waiting. If your bot does nothing between sending a message and listening for its buttons, lower the wait: `createDiscord({ quietTimeMs: 20 })`. Set it too low and a click lands before the bot listens: the test fails with "The application did not respond", though the bot works on Discord.
+Before a member clicks a button or picks from a select, the kit waits until the bot has been quiet for 100ms, so a bot that starts listening for the click just after replying hears it. A test that clicks 40 times spends 4 seconds waiting. If your bot does nothing between sending a message and listening for its buttons, lower the wait: `createDiscord({ quietTimeMs: 20 })`. Set it too low and a click lands before the bot listens: the test fails with "The application did not respond", though the bot works on Discord. These waits, and the 3-second deadline for answering an interaction, count only time your test could run, so a busy machine that pauses the test doesn't make the bot look late.
 
 ## Not modelled yet
 
