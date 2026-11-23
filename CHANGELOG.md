@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Fixed: about one voice connection in 200 failed with an unmodelled "PEM routines::ASN1 lib" error, because the fake voice server's certificate sometimes had an invalid serial number.
 - Running a command waits up to 2 seconds for a bot that hasn't registered any commands yet, so a bot that deploys its commands while it starts doesn't fail the first command. With commands already registered, a wrong name still fails at once.
 - `discord.start(client)` works with a bot that logs itself in (on import, or in its framework's setup) using `discord.token`: it waits for the bot instead of logging in again. A bot that logged in with another token gets a clear error.
 - `discord.member(server, name, { roles })` gives the member roles made with `discord.role(server, name)`, for a bot that checks a member's roles by name.

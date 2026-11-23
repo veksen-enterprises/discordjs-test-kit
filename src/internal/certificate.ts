@@ -43,8 +43,10 @@ export function selfSignedCertificate() {
       sequence(oid("2.5.4.3"), der(0x0c, Buffer.from("discordjs-test-kit"))),
     ),
   );
+  // A positive INTEGER in minimal DER: a first byte of 0x00 would be padding, which OpenSSL
+  // refuses ("illegal padding"); clearing only the top bit did that about once in 200 certificates.
   const serial = randomBytes(8);
-  serial[0]! &= 0x7f;
+  serial[0] = (serial[0]! & 0x3f) | 0x40;
   const now = Date.now();
   const tbs = sequence(
     der(0xa0, der(0x02, Buffer.from([2]))), // v3
