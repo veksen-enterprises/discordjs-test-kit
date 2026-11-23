@@ -382,7 +382,8 @@ export function registerExpressionRoutes(
         roles: (body.roles as string[] | undefined) ?? [],
         reason: reasonOf(req),
       });
-      return respond.json(guild.emojis.get(id));
+      // 201, as the contract run got from the test guild.
+      return respond.json(guild.emojis.get(id), 201);
     }),
   );
 
