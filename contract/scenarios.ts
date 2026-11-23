@@ -518,6 +518,11 @@ export async function runScenarios(
     out.createRole = await call("POST", `/guilds/${target.guildId}/roles`, {
       name: "contract role",
     });
+    // Not a response: the new role's position, which the mock puts at 1 (inferred).
+    out.createdRolePosition = {
+      status: (out.createRole.body as { position?: number })?.position ?? -1,
+      body: null,
+    };
     const roleId = (out.createRole.body as { id?: string })?.id;
     if (roleId) {
       out.getRole = await call(

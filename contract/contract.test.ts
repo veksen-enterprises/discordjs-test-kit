@@ -93,6 +93,7 @@ describe("scenarios against the mock", () => {
       createScheduledEvent: 200,
       deleteScheduledEvent: 204,
       getRole: 200,
+      createdRolePosition: 1,
       typing: 204,
       createChannelSpaced: 201,
       channelNameTrimmed: 1,
