@@ -57,7 +57,7 @@ it("tells the bot a member is typing, with their member, under Guild Message Typ
   ]);
 });
 
-it("shows the bot typing with a 204, and leaves a Gap where it can't send messages", async () => {
+it("shows the bot typing with a 204, and refuses it with Missing Access where it can't send messages", async () => {
   const { general, channel } = await start([]);
 
   await expect(channel.sendTyping()).resolves.toBeUndefined();
@@ -67,8 +67,5 @@ it("shows the bot typing with a 204, and leaves a Gap where it can't send messag
     { id: mock.state.bot.id, type: 1 },
     { deny: Permission.SendMessages },
   );
-  await expect(channel.sendTyping()).rejects.toMatchObject({ code: 0 });
-  expect(mock.rest.unhandled).toEqual([
-    "typing where the bot can't send messages",
-  ]);
+  await expect(channel.sendTyping()).rejects.toMatchObject({ code: 50001 });
 });

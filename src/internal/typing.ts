@@ -45,7 +45,7 @@ export function registerTypingRoute(
 ) {
   const { rest, state } = mock;
   // Seeing the channel is assumed (inferred, not checked). Typing where the bot can't send
-  // messages isn't documented either way, so it's a Gap rather than a guessed 204 or 403.
+  // messages isn't documented; the contract run got 403 50001 Missing Access.
   rest.route(
     "POST",
     "/channels/:channelId/typing",
@@ -66,7 +66,7 @@ export function registerTypingRoute(
           ) & Permission.SendMessages
         )
       )
-        return rest.gap("typing where the bot can't send messages");
+        return respond.missingAccess();
       announceTyping(mock, state.bot, channel);
       return respond.noContent();
     }),

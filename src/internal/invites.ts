@@ -164,8 +164,8 @@ export function registerInviteRoutes(
     [...state.invites.values()].filter((invite) => invite[key] === id);
 
   // Create Channel Invite: CREATE_INSTANT_INVITE, guild channels only (a DM is a Gap). max_uses is
-  // 0-100. The official docs cap max_age at 604800 and docs.discord.food at 5184000, so past 604800
-  // is a Gap. Without `unique`, "try to reuse a similar invite": the mock reuses the bot's invite
+  // 0-100. The official docs cap max_age at 604800 and docs.discord.food at 5184000: the contract
+  // run got 50035 for 604801 ("Int value should be less than or equal to 604800"). Without `unique`, "try to reuse a similar invite": the mock reuses the bot's invite
   // to the channel with the same max_age, max_uses and temporary (what counts as similar is
   // inferred, not checked). Answers 200 with the metadata (docs.discord.food; status inferred).
   rest.route(
@@ -194,9 +194,12 @@ export function registerInviteRoutes(
         max_uses: (body.max_uses as number | undefined) ?? 0,
         temporary: (body.temporary as boolean | undefined) ?? false,
       };
-      if (opts.max_age > 604800)
-        return rest.gap("an invite with max_age over 7 days");
-      if (opts.max_age < 0 || opts.max_uses < 0 || opts.max_uses > 100)
+      if (
+        opts.max_age < 0 ||
+        opts.max_age > 604800 ||
+        opts.max_uses < 0 ||
+        opts.max_uses > 100
+      )
         return respond.invalidFormBody();
       const similar = body.unique
         ? undefined
