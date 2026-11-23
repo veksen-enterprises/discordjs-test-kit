@@ -819,7 +819,7 @@ class Discord {
         matches(c.name ?? "", name, { partial: true }),
       );
     const found = await this.mock
-      .waitForChannel(find, { timeoutMs: FIND_TIMEOUT_MS })
+      .waitFor(find, { timeoutMs: FIND_TIMEOUT_MS })
       .catch(() => undefined);
     if (!found) {
       const names = textChannels().map((c) => `#${c.name}`);
@@ -1001,12 +1001,31 @@ class MemberActor {
     readonly name: string,
   ) {}
 
+  /**
+   * A bot that registers its own commands while it starts may not have finished when the test acts.
+   * While no command at all is registered where `channel` is, wait for the bot to register some,
+   * up to the usual 2 seconds. One registered already means a wrong name fails at once.
+   */
+  private async untilCommandsRegistered(channel: TextChannel | Thread) {
+    const where = this.mock.state.requireChannel(channel.id);
+    const guildId = "guild_id" in where ? where.guild_id : undefined;
+    const registered = () =>
+      this.mock.state.commandsVisibleIn(guildId).length > 0;
+    if (registered()) return;
+    await this.mock
+      .waitFor(() => (registered() ? where : undefined), {
+        timeoutMs: FIND_TIMEOUT_MS,
+      })
+      .catch(() => undefined);
+  }
+
   async runCommand(
     channel: TextChannel | Thread,
     command: string,
     options: Record<string, OptionValue> = {},
     form?: Form,
   ): Promise<Message> {
+    await this.untilCommandsRegistered(channel);
     const values = optionIds(options);
     return this.answer(
       this.actor().slashCommand(
@@ -1025,6 +1044,7 @@ class MemberActor {
     typed: string | number,
     filled: Record<string, OptionValue> = {},
   ): Promise<Choice[]> {
+    await this.untilCommandsRegistered(channel);
     return this.actor()
       .autocomplete(
         this.mock.state.requireChannel(channel.id),
@@ -1042,6 +1062,7 @@ class MemberActor {
     member: Member,
     form?: Form,
   ): Promise<Message> {
+    await this.untilCommandsRegistered(channel);
     const state = this.mock.state;
     return this.answer(
       this.actor().contextMenu(
@@ -1059,6 +1080,7 @@ class MemberActor {
     message: Message,
     form?: Form,
   ): Promise<Message> {
+    await this.untilCommandsRegistered(channel);
     const state = this.mock.state;
     return this.answer(
       this.actor().contextMenu(

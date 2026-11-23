@@ -122,6 +122,38 @@ it("waits for a bot that logs itself in with the test's token", async () => {
   expect((await alice.runCommand(general, "ping")).content).toBe("pong");
 });
 
+it("runs a command the bot is still registering when the test acts", async () => {
+  // Arrange
+  const discord = await createDiscord();
+  const server = discord.guild("SIN");
+  const general = discord.textChannel(server, "general");
+  const alice = discord.member(server, "alice");
+  const client = new Client({
+    intents: [GatewayIntentBits.Guilds],
+    ...discord.clientOptions,
+  });
+  client.on(Events.InteractionCreate, async (interaction) => {
+    if (interaction.isChatInputCommand()) await interaction.reply("pong");
+  });
+  // Deploys its commands a moment after it's ready, as some frameworks do.
+  client.once(Events.ClientReady, (ready) => {
+    setTimeout(
+      () =>
+        void ready.application.commands.set([
+          { name: "ping", description: "Pings" },
+        ]),
+      200,
+    );
+  });
+  await discord.start(client);
+
+  // Act
+  const reply = await alice.runCommand(general, "ping");
+
+  // Assert
+  expect(reply.content).toBe("pong");
+});
+
 it("refuses a bot that logged in with another token", async () => {
   // Arrange
   const discord = await createDiscord();

@@ -921,13 +921,13 @@ export class DiscordMock {
   }
 
   /**
-   * Resolves with the first channel `find` returns, checked now and after every request the bot
-   * makes or dispatch it's sent (a channel the bot creates appears through its own request).
+   * Resolves with the first value `find` returns, checked now and after every request the bot
+   * makes or dispatch it's sent: what the bot creates appears through its own requests.
    */
-  waitForChannel(
-    find: () => APIChannel | undefined,
+  waitFor<T>(
+    find: () => T | undefined,
     opts: { timeoutMs?: number } = {},
-  ): Promise<APIChannel> {
+  ): Promise<T> {
     const now = find();
     if (now) return Promise.resolve(now);
     return new Promise((resolve, reject) => {
