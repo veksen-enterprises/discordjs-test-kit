@@ -1,5 +1,8 @@
 import { once } from "node:events";
 import {
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
   Client,
   Events,
   GatewayIntentBits,
@@ -80,6 +83,35 @@ it("sends the bot's poll, counts members' votes, and ends it with a result messa
   const voters = await ended.poll!.answers.get(2)!.voters.fetch();
   expect([...voters.keys()].sort()).toEqual([alice.id, bob.id].sort());
   expect(() => mock.as(alice).removeVote(stored)).toThrow("poll has ended");
+  mock.assertNoUnhandledRequests();
+});
+
+it("removes a poll message's buttons and edits its text, and keeps the poll", async () => {
+  // Arrange
+  const { general, channel } = await start();
+  mock.grantBot(Permission.SendPolls);
+  const sent = await channel.send({
+    poll: lunch,
+    components: [
+      new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder()
+          .setCustomId("end")
+          .setLabel("End poll")
+          .setStyle(ButtonStyle.Primary),
+      ),
+    ],
+  });
+
+  // Act
+  await sent.edit({ content: "Vote closes at noon", components: [] });
+
+  // Assert
+  const stored = mock.state.requireMessage(general.id, sent.id);
+  expect([
+    stored.content,
+    stored.components,
+    stored.poll?.question.text,
+  ]).toEqual(["Vote closes at noon", [], "Lunch?"]);
   mock.assertNoUnhandledRequests();
 });
 

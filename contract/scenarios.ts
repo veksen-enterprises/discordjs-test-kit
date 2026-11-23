@@ -231,8 +231,9 @@ export async function runScenarios(
         { messages: [ids[0], ids[0], ids[1]] },
       );
     }
-    // Discovery, Discord only: whether a poll message's components can be edited (520003?).
-    if (target.name === "discord") {
+    // resources/poll says a poll message "cannot be edited": run 45106174311 showed that means
+    // the poll, and its components and content can change.
+    {
       const poll = await call("POST", `/channels/${channelId}/messages`, {
         poll: {
           question: { text: "contract?" },
@@ -249,17 +250,17 @@ export async function runScenarios(
           },
         ],
       });
-      out.discoverPollWithButton = poll;
-      const discoveredPollId = (poll.body as { id?: string })?.id;
-      if (discoveredPollId) {
-        out.discoverPollRemoveButtons = await call(
+      out.pollWithButton = poll;
+      const pollMessageId = (poll.body as { id?: string })?.id;
+      if (pollMessageId) {
+        out.pollRemoveButtons = await call(
           "PATCH",
-          `/channels/${channelId}/messages/${discoveredPollId}`,
+          `/channels/${channelId}/messages/${pollMessageId}`,
           { components: [] },
         );
-        out.discoverPollEditContent = await call(
+        out.pollEditContent = await call(
           "PATCH",
-          `/channels/${channelId}/messages/${discoveredPollId}`,
+          `/channels/${channelId}/messages/${pollMessageId}`,
           { content: "edited" },
         );
       }

@@ -3243,9 +3243,10 @@ function interactionMetadata(run: InteractionRun) {
 
 /**
  * resources/poll: "After creation, the poll message cannot be edited", and the code table has
- * 520003 "Cannot edit a poll message"; whether that covers an edit that leaves the poll alone (say,
- * removing buttons) is unchecked, so editing a poll message is a Gap, as is adding a poll to a
- * message that isn't a deferred reply still loading (that one becomes the reply, inferred).
+ * 520003 "Cannot edit a poll message". That's the poll: the contract run edited a poll message's
+ * components and content with 200 each, and the poll stayed. An edit that sends a new `poll` is
+ * still a Gap, as is adding a poll to a message that isn't a deferred reply still loading (that one
+ * becomes the reply, inferred).
  */
 export function pollEditGap(
   rest: RestRouter,
@@ -3253,7 +3254,7 @@ export function pollEditGap(
   raw: unknown,
 ) {
   const body = raw as RESTPostAPIChannelMessageJSONBody | undefined;
-  if (message.poll) return rest.gap("editing a poll message");
+  if (message.poll && body?.poll) return rest.gap("changing a message's poll");
   if (body?.poll && !((message.flags ?? 0) & MessageFlags.Loading))
     return rest.gap("adding a poll to a message in an edit");
   return undefined;

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Polls: the bot can edit a poll message's text and remove its buttons; the poll stays, as on Discord. It used to fail the test as unsupported.
 - New `createDiscord({ privilegedIntents })`: the privileged intents your app has turned on in the Developer Portal (all three by default). Without Message Content, messages the bot fetches arrive without their text too, as on Discord; before, only gateway events lost it.
 - Bans: `members.ban(user, { deleteMessageSeconds })` works, and removes the member's messages from that window. It used to fail the test as unsupported.
 - A bot deleting a member's message in their DMs is refused (50003), as Discord refuses it; it used to succeed.
