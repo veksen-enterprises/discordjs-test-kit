@@ -12,6 +12,18 @@ const MANAGE_GUILD = 1n << 5n;
 const CONTRACT_SOUND =
   "T2dnUwACAAAAAAAAAAB1NCDHAAAAAKk6WkYBE09wdXNIZWFkAQE4AYC7AAAAAABPZ2dTAAAAAAAAAAAAAHU0IMcBAAAAI0qA4QE8T3B1c1RhZ3MMAAAATGF2ZjYzLjEuMTAyAQAAABwAAABlbmNvZGVyPUxhdmM2My4xLjEwMiBsaWJvcHVzT2dnUwAEeDkAAAAAAAB1NCDHAgAAAN0gujwQRTEsNzQ5LTI4MSwrMi4tGXiCAbdsfkDmAAAKvpqnvv+2hdcKceDda6DjxsXDMsZkHm5jUjpFDIpTj0QYsIxkq+yYlnlsVFMwVU6C5BbKWUnYxwldWXijP/esmIUDV0wlJ/WKw/WMdoevflpzXcfZ1s5DLQlJr2/POrQt+pViWY6ZIm/p7sN4m6MSUUUArNFV/6eRtPYcGJOKCT1PUU1wVpwEDuchPEkJ0n+JP8X8ocV+A3iboxG0HL+omxd8PsanS1kLdd2vT/Jw1SshsLXNMVag2dks7MR66Y3hHjevaYJ6r6R62qihX5Z4m6NfdZz8RdC0OAWcMxKhAbuEHU2z0ObjvosK82FS/jwKKgrJUOHKvDNQh42bz4rPBuL6eJujElOqRLrnpWWA9gdofhXZDzZZltPqqFzFclr1m3VfDAFtGLdGd6UmyovQMVFRuXLGN3kvQoVjeJujX3Wc/ElKIurCxscx5W+cdD1PCbIz63XEb8lJbT3RKfY138M79JGrDt6GeJujElbOI4h0kOQDb84xR2I9c+A3IgbpNSuJZYvT/YSVsThU1PvDIaEPRCdYfdOK/AZ4m6MRtBy/UlD/lDsbAOAkdr4YkiPAqSc2T+Cjkwj1/gmPRlcIBUEtsP5y9Goq4DMtu0N3BYUNi0ibKx91nPxFnnKRI2qUE6UNSymEaECWdnRhxDGtg4AviDrno+lRafTtNhrtYSNqGOhImyrSU6pEuBwG1e7q1NCm84ewhVjmjUtOW91FgNQ3HqhUX1uQqyz9YQf0kkibKx91nPxF70zhx2OetF0/Tq0WDWWhsJ+gw5JdS0X+4svTEloekNEuy+BImyrSU6pITqC1WAN4/dtG+Vq3ssoDzE1tq6wvJRw2HvTdJujCPTEmigy/+IZLw94qQEibKtG0HL9SKIDRXa0RNldzBJqDQtetG8DehVU3VTdPL0rkdgFWBPvIOLN8EFBImysfdZz8RdCz5Xl8SURzaJmJkVNg5vwHb9Galp4g31vj2ZEnT9mba/HjaEhIBdFHOi7/7MbdgOxVdrfB7UGDPZjobFdA";
 const MANAGE_CHANNELS = 1n << 4n;
+const ROLE_NAMES = ["contract role", "contract role, edited"];
+const EVENT_NAME = "contract event";
+const EMOJI_NAMES = ["contract", "contract_edited"];
+const SOUND_NAMES = ["contract", "contract edited"];
+const COMMAND_NAME = "contract";
+const PNG =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
+
+interface Named {
+  id: string;
+  name: string;
+}
 
 /**
  * Bot-triggerable requests, run in order against one Target. Each step is something a bot
@@ -32,20 +44,71 @@ export async function runScenarios(
         body: body ? JSON.stringify(body) : undefined,
       });
       const text = await res.text();
-      const parsed = text ? JSON.parse(text) : null;
+      // A Cloudflare error page or an empty 429 isn't JSON; a throw here would skip the cleanup.
+      let parsed: unknown = null;
+      try {
+        parsed = text ? JSON.parse(text) : null;
+      } catch {
+        parsed = { nonJson: text.slice(0, 200) };
+      }
       if (res.status === 429 && attempt < 3) {
-        await new Promise((r) =>
-          setTimeout(r, (parsed.retry_after ?? 1) * 1000),
-        );
+        const retryAfter = (parsed as { retry_after?: number } | null)
+          ?.retry_after;
+        await new Promise((r) => setTimeout(r, (retryAfter ?? 1) * 1000));
         continue;
       }
       return { status: res.status, body: parsed };
     }
   };
 
+  const guild = `/guilds/${target.guildId}`;
+  const app = `/applications/${target.botId}`;
+  const list = async <T>(path: string): Promise<T[]> => {
+    const { body } = await call("GET", path);
+    if (Array.isArray(body)) return body as T[];
+    return ((body as { items?: T[] } | null)?.items ?? []) as T[];
+  };
+  // Everything a run creates carries one of these names. A run that stopped halfway (a throw,
+  // a timeout, a cancelled job) leaves some behind, so the run sweeps them before and after.
+  const sweep = async () => {
+    for (const c of await list<Named>(`${guild}/channels`))
+      if (/^contract-(\d+|spaced)$/.test(c.name)) {
+        // Stopped while it denied itself Manage Channels: lift that first or the delete is refused.
+        await call("DELETE", `/channels/${c.id}/permissions/${target.botId}`);
+        await call("DELETE", `/channels/${c.id}`);
+      }
+    for (const r of await list<Named>(`${guild}/roles`))
+      if (ROLE_NAMES.includes(r.name))
+        await call("DELETE", `${guild}/roles/${r.id}`);
+    for (const e of await list<Named>(`${guild}/scheduled-events`))
+      if (e.name === EVENT_NAME)
+        await call("DELETE", `${guild}/scheduled-events/${e.id}`);
+    for (const e of await list<Named>(`${guild}/emojis`))
+      if (EMOJI_NAMES.includes(e.name))
+        await call("DELETE", `${guild}/emojis/${e.id}`);
+    for (const e of await list<Named>(`${app}/emojis`))
+      if (EMOJI_NAMES.includes(e.name))
+        await call("DELETE", `${app}/emojis/${e.id}`);
+    for (const s of await list<{ sound_id: string; name: string }>(
+      `${guild}/soundboard-sounds`,
+    ))
+      if (SOUND_NAMES.includes(s.name))
+        await call("DELETE", `${guild}/soundboard-sounds/${s.sound_id}`);
+    for (const path of [`${app}${guild}/commands`, `${app}/commands`])
+      for (const c of await list<Named>(path))
+        if (c.name === COMMAND_NAME) await call("DELETE", `${path}/${c.id}`);
+    const me = await call("GET", `${guild}/members/${target.botId}`);
+    if ((me.body as { nick?: string } | null)?.nick === "contract")
+      await call("PATCH", `${guild}/members/@me`, { nick: null });
+  };
+
   const out: Record<string, Observation> = {};
+  await sweep();
   out.gatewayBot = await call("GET", "/gateway/bot");
+  out.gateway = await call("GET", "/gateway");
   out.usersMe = await call("GET", "/users/@me");
+  out.getUser = await call("GET", `/users/${target.botId}`);
+  out.getApplication = await call("GET", "/applications/@me");
   out.unknownChannel = await call("GET", "/channels/1000000000000000000");
 
   out.createChannel = await call("POST", `/guilds/${target.guildId}/channels`, {
@@ -74,6 +137,10 @@ export async function runScenarios(
         "PATCH",
         `/channels/${channelId}/messages/${messageId}`,
         { content: "contract test, edited" },
+      );
+      out.getMessage = await call(
+        "GET",
+        `/channels/${channelId}/messages/${messageId}`,
       );
       // The invite has no Manage Threads or Pin Messages.
       out.deleteThread = await call("DELETE", `/channels/${messageId}`);
@@ -140,6 +207,15 @@ export async function runScenarios(
       `/channels/${channelId}/messages/bulk-delete`,
       { messages: spam },
     );
+    const doomed = await call("POST", `/channels/${channelId}/messages`, {
+      content: "to delete",
+    });
+    const doomedId = (doomed.body as { id?: string })?.id;
+    if (doomedId)
+      out.deleteMessage = await call(
+        "DELETE",
+        `/channels/${channelId}/messages/${doomedId}`,
+      );
     out.editChannel = await call("PATCH", `/channels/${channelId}`, {
       topic: "contract topic",
       rate_limit_per_user: 5,
@@ -166,6 +242,54 @@ export async function runScenarios(
         type: 11,
       },
     );
+    // A thread without a starter message: join, read its members, leave, archive, then list.
+    out.createThread = await call("POST", `/channels/${channelId}/threads`, {
+      name: "contract thread 3",
+      type: 11,
+    });
+    const threadId = (out.createThread.body as { id?: string })?.id;
+    if (threadId) {
+      out.joinThread = await call(
+        "PUT",
+        `/channels/${threadId}/thread-members/@me`,
+      );
+      out.getThreadMember = await call(
+        "GET",
+        `/channels/${threadId}/thread-members/${target.botId}`,
+      );
+      out.listThreadMembers = await call(
+        "GET",
+        `/channels/${threadId}/thread-members`,
+      );
+      // Active threads span the whole guild: compare one entry's shape, as for role counts.
+      const active = await call("GET", `${guild}/threads/active`);
+      const activeBody = active.body as {
+        threads?: { id: string }[];
+        members?: { id: string }[];
+      } | null;
+      out.activeThreads = {
+        status: active.status,
+        body: activeBody && {
+          threads: activeBody.threads?.filter((t) => t.id === threadId),
+          members: activeBody.members?.filter((m) => m.id === threadId),
+        },
+      };
+      out.leaveThread = await call(
+        "DELETE",
+        `/channels/${threadId}/thread-members/@me`,
+      );
+      out.archiveThread = await call("PATCH", `/channels/${threadId}`, {
+        archived: true,
+      });
+      out.publicArchivedThreads = await call(
+        "GET",
+        `/channels/${channelId}/threads/archived/public`,
+      );
+      out.joinedPrivateArchivedThreads = await call(
+        "GET",
+        `/channels/${channelId}/users/@me/threads/archived/private`,
+      );
+    }
     out.listRoles = await call("GET", `/guilds/${target.guildId}/roles`);
     const card = {
       type: 17,
@@ -198,11 +322,16 @@ export async function runScenarios(
       },
     });
     const pollId = (out.sendPoll as { body?: { id?: string } }).body?.id;
-    if (pollId)
+    if (pollId) {
       out.expirePoll = await call(
         "POST",
         `/channels/${channelId}/polls/${pollId}/expire`,
       );
+      out.pollVoters = await call(
+        "GET",
+        `/channels/${channelId}/polls/${pollId}/answers/1`,
+      );
+    }
     const plainId = (out.sendComponentsV2 as { body?: { id?: string } }).body
       ?.id;
     if (plainId)
@@ -332,20 +461,6 @@ export async function runScenarios(
         },
       ],
     });
-    const guild = `/guilds/${target.guildId}`;
-    // A run that stopped halfway leaves its emoji and sound behind: remove them first.
-    for (const emoji of ((await call("GET", `${guild}/emojis`)).body ?? []) as {
-      id: string;
-      name: string;
-    }[])
-      if (emoji.name === "contract")
-        await call("DELETE", `${guild}/emojis/${emoji.id}`);
-    const leftover = (await call("GET", `${guild}/soundboard-sounds`)).body as {
-      items?: { sound_id: string; name: string }[];
-    } | null;
-    for (const sound of leftover?.items ?? [])
-      if (sound.name === "contract")
-        await call("DELETE", `${guild}/soundboard-sounds/${sound.sound_id}`);
     // Whether Discord trims spaces around a channel name: the mock keeps them (inferred).
     out.createChannelSpaced = await call("POST", `${guild}/channels`, {
       name: "  contract-spaced  ",
@@ -369,29 +484,48 @@ export async function runScenarios(
     // The test guild's @everyone grants Create Expressions.
     out.createEmoji = await call("POST", `${guild}/emojis`, {
       name: "contract",
-      image:
-        "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
+      image: PNG,
     });
     const emojiId = (out.createEmoji.body as { id?: string })?.id;
-    if (emojiId)
+    if (emojiId) {
+      out.getEmoji = await call("GET", `${guild}/emojis/${emojiId}`);
+      // Create Expressions covers editing the expressions the bot made itself.
+      out.editEmoji = await call("PATCH", `${guild}/emojis/${emojiId}`, {
+        name: "contract_edited",
+      });
       out.deleteEmoji = await call("DELETE", `${guild}/emojis/${emojiId}`);
+    }
     // 0.3s of Ogg Opus: Discord refuses a file it can't read with 50110.
     out.createSound = await call("POST", `${guild}/soundboard-sounds`, {
       name: "contract",
       sound: `data:audio/ogg;base64,${CONTRACT_SOUND}`,
     });
     const soundId = (out.createSound.body as { sound_id?: string })?.sound_id;
-    if (soundId)
+    if (soundId) {
+      out.getSound = await call("GET", `${guild}/soundboard-sounds/${soundId}`);
+      out.editSound = await call(
+        "PATCH",
+        `${guild}/soundboard-sounds/${soundId}`,
+        { name: "contract edited" },
+      );
       out.deleteSound = await call(
         "DELETE",
         `${guild}/soundboard-sounds/${soundId}`,
       );
+    }
     // The test guild's @everyone grants Change Nickname.
     out.setOwnNickname = await call("PATCH", `${guild}/members/@me`, {
       nick: "contract",
     });
     if (out.setOwnNickname.status === 200)
       await call("PATCH", `${guild}/members/@me`, { nick: null });
+    out.getBotMember = await call("GET", `${guild}/members/${target.botId}`);
+    const botName = (out.usersMe.body as { username?: string })?.username;
+    if (botName)
+      out.searchMembers = await call(
+        "GET",
+        `${guild}/members/search?query=${encodeURIComponent(botName)}&limit=1`,
+      );
     out.listGuildChannels = await call("GET", `${guild}/channels`);
     out.listGuilds = await call("GET", "/users/@me/guilds");
     out.getGuild = await call("GET", `${guild}?with_counts=true`);
@@ -454,10 +588,19 @@ export async function runScenarios(
           ? { "<role id>": Object.values(counts.body)[0] }
           : counts.body,
     };
-    out.listAppEmojis = await call(
-      "GET",
-      `/applications/${target.botId}/emojis`,
-    );
+    out.listAppEmojis = await call("GET", `${app}/emojis`);
+    out.createAppEmoji = await call("POST", `${app}/emojis`, {
+      name: "contract",
+      image: PNG,
+    });
+    const appEmojiId = (out.createAppEmoji.body as { id?: string })?.id;
+    if (appEmojiId) {
+      out.getAppEmoji = await call("GET", `${app}/emojis/${appEmojiId}`);
+      out.editAppEmoji = await call("PATCH", `${app}/emojis/${appEmojiId}`, {
+        name: "contract_edited",
+      });
+      out.deleteAppEmoji = await call("DELETE", `${app}/emojis/${appEmojiId}`);
+    }
     out.archivedPrivateThreads = await call(
       "GET",
       `/channels/${channelId}/threads/archived/private`,
@@ -468,7 +611,7 @@ export async function runScenarios(
     // The invite has no Create Events, but the test guild's @everyone grants it.
     const start = new Date(Date.now() + 86_400_000).toISOString();
     out.createScheduledEvent = await call("POST", `${guild}/scheduled-events`, {
-      name: "contract event",
+      name: EVENT_NAME,
       privacy_level: 2,
       entity_type: 3,
       scheduled_start_time: start,
@@ -484,13 +627,59 @@ export async function runScenarios(
         `${guild}/scheduled-events/${eventId}`,
         { status: 3 },
       );
+      out.getScheduledEvent = await call(
+        "GET",
+        `${guild}/scheduled-events/${eventId}`,
+      );
+      out.eventUsers = await call(
+        "GET",
+        `${guild}/scheduled-events/${eventId}/users`,
+      );
+      out.cancelScheduledEvent = await call(
+        "PATCH",
+        `${guild}/scheduled-events/${eventId}`,
+        { status: 4 },
+      );
       out.deleteScheduledEvent = await call(
         "DELETE",
         `${guild}/scheduled-events/${eventId}`,
       );
     }
-    const commands = `/applications/${target.botId}${guild}/commands`;
+    const commands = `${app}${guild}/commands`;
     out.listCommandPermissions = await call("GET", `${commands}/permissions`);
+    // Registering, reading, editing, overwriting and deleting a command, per guild and globally.
+    // The contract app has no commands of its own, so the bulk overwrite replaces nothing real.
+    for (const [scope, path] of [
+      ["Guild", commands],
+      ["Global", `${app}/commands`],
+    ] as const) {
+      const created = await call("POST", path, {
+        name: COMMAND_NAME,
+        description: "contract command",
+        type: 1,
+      });
+      out[`create${scope}Command`] = created;
+      const commandId = (created.body as { id?: string })?.id;
+      out[`list${scope}Commands`] = await call("GET", path);
+      if (commandId) {
+        out[`get${scope}Command`] = await call("GET", `${path}/${commandId}`);
+        out[`edit${scope}Command`] = await call(
+          "PATCH",
+          `${path}/${commandId}`,
+          { description: "contract command, edited" },
+        );
+      }
+      const bulk = await call("PUT", path, [
+        { name: COMMAND_NAME, description: "contract command, bulk", type: 1 },
+      ]);
+      out[`bulk${scope}Commands`] = bulk;
+      const bulkId = (bulk.body as { id?: string }[] | null)?.[0]?.id;
+      if (bulkId)
+        out[`delete${scope}Command`] = await call(
+          "DELETE",
+          `${path}/${bulkId}`,
+        );
+    }
     out.appCommandPermissions = await call(
       "GET",
       `${commands}/${target.botId}/permissions`,
@@ -516,7 +705,7 @@ export async function runScenarios(
       `/channels/${channelId}/permissions/${target.botId}`,
     );
     out.createRole = await call("POST", `/guilds/${target.guildId}/roles`, {
-      name: "contract role",
+      name: ROLE_NAMES[0],
     });
     // Not a response: the new role's position, which the mock puts at 1 (inferred).
     out.createdRolePosition = {
@@ -540,6 +729,19 @@ export async function runScenarios(
         `/guilds/${target.guildId}/roles/${roleId}`,
         { name: "contract role, edited" },
       );
+      // Manage Roles lets the bot hand itself a role below its own.
+      out.addRoleToBot = await call(
+        "PUT",
+        `${guild}/members/${target.botId}/roles/${roleId}`,
+      );
+      out.removeRoleFromBot = await call(
+        "DELETE",
+        `${guild}/members/${target.botId}/roles/${roleId}`,
+      );
+      // Where the role lands differs between the guilds: compare the answer's shape only.
+      out.rolePositions = await call("PATCH", `${guild}/roles`, [
+        { id: roleId, position: 1 },
+      ]);
       out.deleteRole = await call(
         "DELETE",
         `/guilds/${target.guildId}/roles/${roleId}`,
@@ -547,6 +749,7 @@ export async function runScenarios(
     }
   } finally {
     out.deleteChannel = await call("DELETE", `/channels/${channelId}`);
+    await sweep();
   }
   // Let the gateway deliver the dispatches the steps above caused.
   await new Promise((r) => setTimeout(r, 1_000));

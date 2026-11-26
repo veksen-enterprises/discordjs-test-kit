@@ -20,10 +20,16 @@ const TEST_GUILD_EVERYONE = "2248473465835073";
 /** The permissions the test bot was invited with; the mock bot gets the same through a role. */
 export const INVITE_PERMISSIONS = 268561488n;
 
+// Beyond what a message bot needs, the intent of every event the scenarios cause, so those
+// dispatches are compared too.
 const INTENTS = [
   GatewayIntentBits.Guilds,
   GatewayIntentBits.GuildMessages,
   GatewayIntentBits.MessageContent,
+  GatewayIntentBits.GuildMessageReactions,
+  GatewayIntentBits.GuildInvites,
+  GatewayIntentBits.GuildExpressions,
+  GatewayIntentBits.GuildScheduledEvents,
 ];
 
 async function connect(
@@ -36,7 +42,10 @@ async function connect(
     ...(api ? { rest: { api } } : {}),
   });
   client.on(Events.Raw, (packet: { t?: string; d: unknown }) => {
-    if (packet.t) dispatches.push({ t: packet.t, d: packet.d });
+    // Raw fires before discord.js handles the packet, and some handlers write live objects into
+    // it (InviteCreateAction assigns channel and guild), so keep a copy of what was sent.
+    if (packet.t)
+      dispatches.push({ t: packet.t, d: structuredClone(packet.d) });
   });
   const ready = once(client, Events.ClientReady);
   await client.login(token);
