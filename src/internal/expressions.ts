@@ -417,7 +417,8 @@ export function registerExpressionRoutes(
           reasonOf(req),
         );
       else announce(mock, guild, "emoji");
-      return respond.json(emoji);
+      // Without `user`, like the upload (contract run 45912869868).
+      return respond.json(shown(emoji, false));
     }),
   );
 
@@ -597,7 +598,9 @@ export function registerExpressionRoutes(
         available: true,
       };
       state.applicationEmojis.set(emoji.id!, emoji);
-      return respond.json(emoji);
+      // 201 without `user`, as contract runs 45912556990 and 45912869868 got from Discord.
+      const { user: _, ...created } = emoji;
+      return respond.json(created, 201);
     }),
   );
   rest.route(
@@ -617,7 +620,9 @@ export function registerExpressionRoutes(
           return rest.gap("a duplicate application emoji name");
         emoji.name = body.name as string;
       }
-      return respond.json(emoji);
+      // Without `user`, like the upload (contract run 45912869868).
+      const { user: _, ...modified } = emoji;
+      return respond.json(modified);
     }),
   );
   rest.route(

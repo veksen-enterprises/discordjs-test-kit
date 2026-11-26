@@ -268,8 +268,8 @@ it("uploads an emoji to the bot's application", async () => {
     name: "check",
   });
 
-  // Assert
-  expect([emoji.name, emoji.author?.id]).toEqual(["check", client.user!.id]);
+  // Assert: Discord's answer to the upload leaves out who made it.
+  expect([emoji.name, emoji.author]).toEqual(["check", undefined]);
 });
 
 it("lists the application's emojis", async () => {

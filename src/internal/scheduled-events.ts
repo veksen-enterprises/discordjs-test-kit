@@ -88,8 +88,11 @@ function announce(
   event: APIGuildScheduledEvent,
 ) {
   // Every bot in the guild with the intent hears it, whatever the event's channel (inferred, not
-  // checked: the docs name no permission for receiving it).
-  mock.gateway.dispatch(t, event, GatewayIntentBits.GuildScheduledEvents);
+  // checked: the docs name no permission for receiving it). Without `creator`: contract run
+  // 45912869868 got none on create, update or delete of the bot's own event; for an event a
+  // user made, inferred.
+  const { creator: _, ...sent } = event;
+  mock.gateway.dispatch(t, sent, GatewayIntentBits.GuildScheduledEvents);
 }
 
 /** `user` creates a scheduled event in `guild`, as from the Discord app. */
@@ -533,7 +536,9 @@ export function registerScheduledEventRoutes(
         target_id: event.id,
         reason: reasonOf(req),
       });
-      return respond.json(event);
+      // Without `creator`, like the create response (contract run 45912869868).
+      const { creator: _, ...modified } = event;
+      return respond.json(modified);
     }),
   );
 

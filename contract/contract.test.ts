@@ -143,7 +143,7 @@ describe("scenarios against the mock", () => {
       listSoundboardSounds: 200,
       roleMemberCounts: 200,
       listAppEmojis: 200,
-      createAppEmoji: 200,
+      createAppEmoji: 201,
       getAppEmoji: 200,
       editAppEmoji: 200,
       deleteAppEmoji: 204,
