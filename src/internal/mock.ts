@@ -43,6 +43,7 @@ import {
 } from "./command-permissions.js";
 import { registerExpressionRoutes } from "./expressions.js";
 import { Gateway } from "./gateway.js";
+import { registerGuildSettingsRoutes } from "./guild-settings.js";
 import { registerGuildRoutes } from "./guilds.js";
 import { deleteInvite, registerInviteRoutes } from "./invites.js";
 import {
@@ -54,6 +55,7 @@ import {
 } from "./limits.js";
 import { banUser, kickMember, registerMemberRoutes } from "./members.js";
 import { registerMessageRoutes } from "./messages.js";
+import { registerMonetizationRoutes } from "./monetization.js";
 import {
   ALL_PERMISSIONS,
   computePermissions,
@@ -61,6 +63,7 @@ import {
   interactionMember,
   Permission,
 } from "./payloads.js";
+import { registerPermissionRoutes } from "./permissions.js";
 import { pollFrom, registerPollRoutes, removeVote, vote } from "./polls.js";
 import {
   RestRouter,
@@ -1996,6 +1999,13 @@ export class DiscordMock {
       "/applications/@me",
       authed(() => respond.json(application())),
     );
+    // Get Current Bot Application Information (Discord's topics/oauth2): "Returns the bot's
+    // application object", the same one.
+    rest.route(
+      "GET",
+      "/oauth2/applications/@me",
+      authed(() => respond.json(application())),
+    );
     // docs.discord.food/resources/application, Modify Current Application: every param is
     // optional and it "Returns the updated application object on success". Only the description
     // is modelled; neither docs.discord.food nor Discord's docs give it a length limit, so none is
@@ -3200,6 +3210,9 @@ export class DiscordMock {
     });
     registerMemberRoutes(this, authed);
     registerGuildRoutes(this, authed);
+    registerGuildSettingsRoutes(this, authed);
+    registerPermissionRoutes(this, authed);
+    registerMonetizationRoutes(this, authed);
     registerInviteRoutes(this, authed);
     registerTemplateRoutes(this, authed);
     registerVoiceRoutes(this, authed);

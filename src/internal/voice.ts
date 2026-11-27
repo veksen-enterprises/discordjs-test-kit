@@ -271,4 +271,82 @@ export function registerVoiceRoutes(
       return respond.noContent();
     }),
   );
+
+  // List Voice Regions and List Guild Voice Regions (docs.discord.food/resources/voice). The list
+  // is what contract run 45916746107 got for both routes. `optimal` is "the closest to the
+  // current user's client": us-west for that run's machine, kept as it was.
+  rest.route(
+    "GET",
+    "/voice/regions",
+    authed(() => respond.json(VOICE_REGIONS)),
+  );
+  rest.route(
+    "GET",
+    "/guilds/:guildId/regions",
+    authed((req) =>
+      state.guilds.has(req.params.guildId!)
+        ? respond.json(VOICE_REGIONS)
+        : respond.error(404, 10004, "Unknown Guild"),
+    ),
+  );
+
+  // Set Voice Channel Status (Discord's resources/channel, docs.discord.food/resources/channel):
+  // SET_VOICE_CHANNEL_STATUS, "and additionally the MANAGE_CHANNELS permission if the current user
+  // is not connected to the voice channel"; up to 500 characters; fires Voice Channel Status
+  // Update. The contract run got 204 for a set and for a clear, connected. 50013 for a missing
+  // permission and 50035 for a long status are inferred, not checked. A channel that isn't a voice
+  // channel has no documented answer: a Gap.
+  rest.route(
+    "PUT",
+    "/channels/:channelId/voice-status",
+    authed((req) => {
+      const channel = state.channels.get(req.params.channelId!);
+      if (!channel) return respond.unknownChannel();
+      if (channel.type !== ChannelType.GuildVoice)
+        return rest.gap("a voice status on a channel that isn't voice");
+      const guild = state.requireGuild(channel.guild_id!);
+      const connected =
+        voiceStateOf(mock, guild, state.bot.id)?.channel_id === channel.id;
+      const denied = mock.checkBotPerms(
+        channel,
+        Permission.SetVoiceChannelStatus |
+          (connected ? 0n : Permission.ManageChannels),
+      );
+      if (denied) return denied;
+      const { status } = (req.body ?? {}) as { status?: unknown };
+      if (
+        status !== null &&
+        (typeof status !== "string" || status.length > 500)
+      )
+        return respond.invalidFormBody();
+      mock.gateway.dispatch(
+        GatewayDispatchEvents.VoiceChannelStatusUpdate,
+        { id: channel.id, guild_id: guild.id, status: status || null },
+        GatewayIntentBits.Guilds,
+      );
+      return respond.noContent();
+    }),
+  );
 }
+
+const region = (id: string, name: string, optimal = false) => ({
+  id,
+  name,
+  custom: false,
+  deprecated: false,
+  optimal,
+});
+const VOICE_REGIONS = [
+  region("brazil", "Brazil"),
+  region("hongkong", "Hong Kong"),
+  region("india", "India"),
+  region("japan", "Japan"),
+  region("rotterdam", "Rotterdam"),
+  region("singapore", "Singapore"),
+  region("southafrica", "South Africa"),
+  region("sydney", "Sydney"),
+  region("us-central", "US Central"),
+  region("us-east", "US East"),
+  region("us-south", "US South"),
+  region("us-west", "US West", true),
+];

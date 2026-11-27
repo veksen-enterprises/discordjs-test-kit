@@ -2,6 +2,7 @@ import { EventEmitter } from "node:events";
 import {
   ApplicationCommandType,
   ChannelType,
+  type APIApplicationRoleConnectionMetadata,
   type APIApplicationCommand,
   type APIAttachment,
   type APIAutoModerationRule,
@@ -148,6 +149,9 @@ export class DiscordState extends EventEmitter<{
   readonly applicationId: string;
   /** The app's description, which a bot can rewrite with PATCH /applications/@me. */
   applicationDescription = "";
+  /** The app's linked-role metadata records, set with PUT role-connections/metadata. */
+  applicationRoleConnectionMetadata: APIApplicationRoleConnectionMetadata[] =
+    [];
   readonly bot: APIUser;
 
   constructor() {

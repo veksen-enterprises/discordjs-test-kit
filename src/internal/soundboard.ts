@@ -281,4 +281,30 @@ export function registerSoundboardRoutes(
       return respond.noContent();
     }),
   );
+
+  // List Default Soundboard Sounds (docs.discord.food/resources/soundboard): "can be used by all
+  // users". The six are what contract run 45916746107 got; Discord's example default sound is the
+  // first of them.
+  rest.route(
+    "GET",
+    "/soundboard-default-sounds",
+    authed(() => respond.json(DEFAULT_SOUNDS)),
+  );
 }
+
+const defaultSound = (sound_id: string, name: string, emoji_name: string) => ({
+  name,
+  sound_id,
+  volume: 1,
+  emoji_id: null,
+  emoji_name,
+  available: true,
+});
+const DEFAULT_SOUNDS = [
+  defaultSound("1", "quack", "🦆"),
+  defaultSound("2", "airhorn", "🔊"),
+  defaultSound("3", "cricket", "🦗"),
+  defaultSound("4", "golf clap", "👏"),
+  defaultSound("5", "sad horn", "🎺"),
+  defaultSound("7", "ba dum tss", "🥁"),
+];

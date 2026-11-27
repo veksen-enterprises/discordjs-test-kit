@@ -293,6 +293,56 @@ export function registerMemberRoutes(
     }),
   );
 
+  // Add Guild Member (docs.discord.food/resources/guild) needs an OAuth2 access token with the
+  // guilds.join scope. The World issues no OAuth2 tokens, so every token is refused with 50025:
+  // the contract run got 403 50025 for a made-up token, even for a user already in the guild.
+  // "The bot must be a member of the guild with the CREATE_INSTANT_INVITE permission"; 50013
+  // without it, and checking it before the token, are inferred, not checked.
+  rest.route(
+    "PUT",
+    "/guilds/:guildId/members/:userId",
+    authed((req) => {
+      const guild = guildOf(req);
+      if (!guild) return unknownGuild();
+      const body = (req.body ?? {}) as { access_token?: unknown };
+      if (typeof body.access_token !== "string")
+        return rest.gap("Add Guild Member without an access token");
+      if (!botHas(guild, Permission.CreateInstantInvite))
+        return respond.missingPermissions();
+      return respond.error(403, 50025, "Invalid OAuth2 access token");
+    }),
+  );
+
+  // Modify Current Guild Member Nick (docs.discord.food/resources/guild): deprecated, "see Modify
+  // Current Guild Member". The contract run got 200 and the member object, as through @me, with
+  // Change Nickname.
+  rest.route(
+    "PATCH",
+    "/guilds/:guildId/members/@me/nick",
+    authed((req) => {
+      const guild = guildOf(req);
+      if (!guild) return unknownGuild();
+      const member = guild.members.get(bot)!;
+      const body = (req.body ?? {}) as Record<string, unknown>;
+      const other = Object.keys(body).find((key) => key !== "nick");
+      if (other) return rest.gap(`PATCH members/@me/nick ${other}`);
+      if (!botHas(guild, Permission.ChangeNickname))
+        return respond.missingPermissions();
+      const nick = (body.nick as string | null | undefined) || null;
+      if (nick !== (member.nick ?? null))
+        recordAudit(mock, guild, {
+          action_type: AuditLogEvent.MemberUpdate,
+          user_id: bot,
+          target_id: bot,
+          changes: [change("nick", member.nick ?? null, nick)],
+          reason: reasonOf(req),
+        });
+      member.nick = nick;
+      announceUpdate(guild, member);
+      return respond.json(member);
+    }),
+  );
+
   const memberRole = (add: boolean) =>
     authed((req) => {
       const guild = guildOf(req);

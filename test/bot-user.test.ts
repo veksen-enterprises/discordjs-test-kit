@@ -90,3 +90,16 @@ it("answers the gateway url without authentication", async () => {
   // Assert
   expect(gateway.url).toMatch(/^ws:\/\/127\.0\.0\.1:\d+/);
 });
+
+it("answers the bot's application on the OAuth2 route too", async () => {
+  // Arrange
+  await login();
+
+  // Act
+  const app = (await client.rest.get(Routes.oauth2CurrentApplication())) as {
+    id: string;
+  };
+
+  // Assert
+  expect(app.id).toBe(client.user!.id);
+});

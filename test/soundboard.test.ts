@@ -3,6 +3,7 @@ import {
   Client,
   Events,
   GatewayIntentBits,
+  Routes,
   type VoiceChannel,
 } from "discord.js";
 import { afterEach, beforeEach, expect, it } from "vitest";
@@ -237,4 +238,25 @@ it("records a sound played from outside the channel as unmodelled, since Discord
     "a soundboard sound from a bot not in the channel",
   ]);
   mock.rest.unhandled.length = 0;
+});
+
+it("lists Discord's default sounds", async () => {
+  // Arrange
+  await botWithSounds(0n);
+
+  // Act
+  // discord.js 14's typings lack Client#fetchDefaultSoundboardSounds; its route is the same.
+  const sounds = (await client.rest.get(Routes.soundboardDefaultSounds())) as {
+    name: string;
+  }[];
+
+  // Assert
+  expect(sounds.map((s) => s.name)).toEqual([
+    "quack",
+    "airhorn",
+    "cricket",
+    "golf clap",
+    "sad horn",
+    "ba dum tss",
+  ]);
 });

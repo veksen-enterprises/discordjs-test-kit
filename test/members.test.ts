@@ -1,7 +1,8 @@
 import { once } from "node:events";
-import { Client, Events, GatewayIntentBits } from "discord.js";
+import { Client, Events, GatewayIntentBits, Routes } from "discord.js";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { createDiscordMock, type DiscordMock } from "../src/internal/mock.js";
+import { Permission } from "../src/internal/payloads.js";
 
 let mock: DiscordMock;
 let client: Client;
@@ -217,3 +218,32 @@ async function login(guildId: string) {
   await ready;
   return client.guilds.cache.get(guildId)!;
 }
+
+it("sets the bot's nickname through the old nickname route", async () => {
+  // Arrange
+  const record = mock.createGuild("g");
+  mock.grantBot(Permission.ChangeNickname);
+  const guild = await login(record.id);
+
+  // Act
+  await client.rest.patch(Routes.guildCurrentMemberNickname(guild.id), {
+    body: { nick: "Ref" },
+  });
+
+  // Assert
+  expect(record.members.get(client.user!.id)!.nick).toBe("Ref");
+});
+
+it("refuses to add a member with an OAuth2 token, since the test world issues none", async () => {
+  // Arrange
+  const record = mock.createGuild("g");
+  const alice = mock.createUser("alice");
+  mock.grantBot(Permission.CreateInstantInvite);
+  const guild = await login(record.id);
+
+  // Act
+  const added = guild.members.add(alice.id, { accessToken: "token" });
+
+  // Assert
+  await expect(added).rejects.toMatchObject({ code: 50025 });
+});

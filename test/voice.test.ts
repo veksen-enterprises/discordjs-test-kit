@@ -1,5 +1,5 @@
 import { once } from "node:events";
-import { Client, Events, GatewayIntentBits } from "discord.js";
+import { Client, Events, GatewayIntentBits, Routes } from "discord.js";
 import { afterEach, beforeEach, expect, it } from "vitest";
 import { createDiscordMock, type DiscordMock } from "../src/internal/mock.js";
 import { Permission } from "../src/internal/payloads.js";
@@ -154,4 +154,68 @@ it("tells the bot when a voice channel's session starts and ends", async () => {
       d: { id: lobby.id, guild_id: guild.id, status: null },
     },
   ]);
+});
+
+it("lists the voice regions a channel can use", async () => {
+  // Arrange
+  const { guild } = world();
+  await login();
+
+  // Act
+  const regions = await client.fetchVoiceRegions();
+  const inGuild = (await client.rest.get(
+    Routes.guildVoiceRegions(guild.id),
+  )) as { id: string }[];
+
+  // Assert
+  expect(regions.get("us-east")?.name).toBe("US East");
+  expect(inGuild.map((r) => r.id)).toEqual([...regions.keys()]);
+});
+
+it("sets a voice channel's status while connected, and tells the bot", async () => {
+  // Arrange
+  const { guild, lobby } = world();
+  mock.grantBot(Permission.SetVoiceChannelStatus | Permission.Connect);
+  await login();
+  const joined = nextMove();
+  client.guilds.cache.get(guild.id)!.shard.send({
+    op: 4,
+    d: {
+      guild_id: guild.id,
+      channel_id: lobby.id,
+      self_mute: false,
+      self_deaf: false,
+    },
+  });
+  await joined;
+  const statuses: unknown[] = [];
+  client.on(Events.Raw, (packet: { t?: string; d: unknown }) => {
+    if (packet.t === "VOICE_CHANNEL_STATUS_UPDATE") statuses.push(packet.d);
+  });
+
+  // Act
+  await client.rest.put(Routes.channelVoiceStatus(lobby.id), {
+    body: { status: "raid night" },
+  });
+  await new Promise((r) => setTimeout(r, 50));
+
+  // Assert
+  expect(statuses).toEqual([
+    { id: lobby.id, guild_id: guild.id, status: "raid night" },
+  ]);
+});
+
+it("refuses a voice status from a bot that isn't connected and lacks Manage Channels", async () => {
+  // Arrange
+  const { lobby } = world();
+  mock.grantBot(Permission.SetVoiceChannelStatus | Permission.Connect);
+  await login();
+
+  // Act
+  const set = client.rest.put(Routes.channelVoiceStatus(lobby.id), {
+    body: { status: "raid night" },
+  });
+
+  // Assert
+  await expect(set).rejects.toMatchObject({ code: 50013 });
 });
