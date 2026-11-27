@@ -11,6 +11,8 @@ export interface Target {
   botId: string;
   /** Every gateway dispatch the bot received, in order. */
   dispatches: { t: string; d: unknown }[];
+  /** Sends a gateway payload on the guild's shard, as a bot does to join voice or request members. */
+  gatewaySend(payload: { op: number; d: unknown }): void;
   close(): Promise<void>;
 }
 
@@ -30,6 +32,8 @@ const INTENTS = [
   GatewayIntentBits.GuildInvites,
   GatewayIntentBits.GuildExpressions,
   GatewayIntentBits.GuildScheduledEvents,
+  GatewayIntentBits.GuildVoiceStates,
+  GatewayIntentBits.GuildMessageTyping,
 ];
 
 async function connect(
@@ -66,6 +70,8 @@ export async function discordTarget(
     guildId,
     botId: client.user!.id,
     dispatches,
+    gatewaySend: (payload) =>
+      client.guilds.cache.get(guildId)?.shard.send(payload),
     close: () => client.destroy(),
   };
 }
@@ -88,6 +94,8 @@ export async function mockTarget(): Promise<Target> {
     guildId: guild.id,
     botId: mock.state.bot.id,
     dispatches,
+    gatewaySend: (payload) =>
+      client.guilds.cache.get(guild.id)?.shard.send(payload),
     close: async () => {
       await client.destroy();
       await mock.close();

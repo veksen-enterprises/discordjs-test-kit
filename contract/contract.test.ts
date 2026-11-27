@@ -56,10 +56,12 @@ describe("scenarios against the mock", () => {
       deleteThreadWithoutManageChannels: 200,
       pinMessage: 403,
       listPins: 200,
+      listPinsLegacy: 200,
       react: 204,
       listReactions: 200,
       removeUserReaction: 204,
       removeEmojiReactions: 204,
+      removeOwnReaction: 204,
       removeAllReactions: 204,
       bulkDeleteTooFew: 400,
       bulkDelete: 204,
@@ -75,6 +77,8 @@ describe("scenarios against the mock", () => {
       listThreadMembers: 200,
       activeThreads: 200,
       leaveThread: 204,
+      addThreadMemberById: 204,
+      removeThreadMemberById: 204,
       archiveThread: 200,
       publicArchivedThreads: 200,
       joinedPrivateArchivedThreads: 200,
@@ -109,9 +113,14 @@ describe("scenarios against the mock", () => {
       createSound: 201,
       getSound: 200,
       editSound: 200,
+      botVoiceStateInVoice: 200,
+      botVoiceStateById: 200,
+      sendSoundboardSound: 204,
       deleteSound: 204,
       setOwnNickname: 200,
       getBotMember: 200,
+      listMembers: 200,
+      setOwnNicknameById: 403,
       searchMembers: 200,
       listGuildChannels: 200,
       listGuilds: 200,
@@ -132,6 +141,14 @@ describe("scenarios against the mock", () => {
       pruneCount: 403,
       unknownEmoji: 404,
       listStickers: 200,
+      createSticker: 201,
+      getGuildSticker: 200,
+      getSticker: 200,
+      editSticker: 200,
+      deleteSticker: 204,
+      editBotUser: 200,
+      editApplication: 200,
+      openDm: 200,
       unknownScheduledEvent: 404,
       widgetSettings: 403,
       widgetJson: 403,
@@ -248,6 +265,10 @@ describe.skipIf(!TOKEN)("mock against real Discord", () => {
         ),
       );
       compare("gateway", discord.dispatches, mock.dispatches);
+      // An event the mock sends and Discord doesn't would let a bot's handler run in tests only.
+      for (const t of Object.keys(mock.dispatches).sort())
+        if (!(t in discord.dispatches))
+          differences.push(`gateway.${t}: mock sends it, Discord doesn't`);
 
       writeFileSync(
         REPORT,

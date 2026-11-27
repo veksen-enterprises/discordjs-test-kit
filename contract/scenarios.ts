@@ -20,6 +20,14 @@ const COMMAND_NAME = "contract";
 const PNG =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
 
+/** 320x320 solid PNG, the size Discord's sticker upload asks for. */
+const STICKER_PNG =
+  "iVBORw0KGgoAAAANSUhEUgAAAUAAAAFACAIAAABC8jL9AAACs0lEQVR42u3TQQkAAAwDsfrXNk+rh/0GgSg4uOwEeEoCMDBgYMDAYGDAwICBAQODgQEDAwYGAwMGBgwMGBgMDBgYMDBgYDAwYGDAwGBgwMCAgQEDg4EBAwMGBgwMBgYMDBgYDAwYGDAwYGAwMGBgwMBgYBXAwICBAQODgQEDAwYGDAwGBgwMGBgMDBgYMDBgYDAwYGDAwICBwcCAgQEDg4EBAwMGBgwMBgYMDBgYMDAYGDAwYGAwMGBgwMCAgcHAgIEBA4OBAQMDBgYMDAYGDAwYGDAwGBgwMGBgMDBgYMDAgIHBwICBAQMDBgYDAwYGDAwGBgwMGBgwMBgYMDBgYMDAYGDAwICBwcCAgQEDAwYGAwMGBgwMBgYMDBgYMDAYGDAwYGDAwGBgwMCAgcHAgIEBAwMGBgMDBgYMDBgYDAwYGDAwGBgwMGBgwMBgYMDAgIHBwBKAgQEDAwYGAwMGBgwMGBgMDBgYMDAYGDAwYGDAwGBgwMCAgQEDg4EBAwMGBgMDBgYMDBgYDAwYGDAwYGAwMGBgwMBgYMDAgIEBA4OBAQMDBgYDAwYGDAwYGAwMGBgwMGBgMDBgYMDAYGDAwICBAQODgQEDAwYGDAwGBgwMGBgMDBgYMDBgYDAwYGDAwICBwcCAgQEDg4EBAwMGBgwMBgYMDBgYDAwYGDAwYGAwMGBgwMCAgcHAgIEBA4OBAQMDBgYMDAYGDAwYGDAwGBgwMGBgMDBgYMDAgIHBwICBAQMDEoCBAQMDBgYDAwYGDAwYGAwMGBgwMBgYMDBgYMDAYGDAwICBAQODgQEDAwYGAwMGBgwMGBgMDBgYMDBgYDAwYGDAwGBgwMCAgQEDg4EBAwMGBgOrAAYGDAwYGAwMGBgwMGBgMDBgYMDAYGDAwICBAQODgQEDAwYGDAwGBgwMHBXjMloEk7zf2QAAAABJRU5ErkJggg==";
+const STICKER_NAMES = ["contract", "contract edited"];
+const VOICE_STATE_UPDATE = 4;
+const REQUEST_GUILD_MEMBERS = 8;
+const REQUEST_SOUNDBOARD_SOUNDS = 31;
+
 interface Named {
   id: string;
   name: string;
@@ -72,7 +80,7 @@ export async function runScenarios(
   // a timeout, a cancelled job) leaves some behind, so the run sweeps them before and after.
   const sweep = async () => {
     for (const c of await list<Named>(`${guild}/channels`))
-      if (/^contract-(\d+|spaced)$/.test(c.name)) {
+      if (/^contract-(\d+|spaced|voice)$/.test(c.name)) {
         // Stopped while it denied itself Manage Channels: lift that first or the delete is refused.
         await call("DELETE", `/channels/${c.id}/permissions/${target.botId}`);
         await call("DELETE", `/channels/${c.id}`);
@@ -94,6 +102,9 @@ export async function runScenarios(
     ))
       if (SOUND_NAMES.includes(s.name))
         await call("DELETE", `${guild}/soundboard-sounds/${s.sound_id}`);
+    for (const s of await list<Named>(`${guild}/stickers`))
+      if (STICKER_NAMES.includes(s.name))
+        await call("DELETE", `${guild}/stickers/${s.id}`);
     for (const path of [`${app}${guild}/commands`, `${app}/commands`])
       for (const c of await list<Named>(path))
         if (c.name === COMMAND_NAME) await call("DELETE", `${path}/${c.id}`);
@@ -101,6 +112,24 @@ export async function runScenarios(
     if ((me.body as { nick?: string } | null)?.nick === "contract")
       await call("PATCH", `${guild}/members/@me`, { nick: null });
   };
+
+  /** A multipart request, as discord.js sends a file upload. */
+  const callForm = async (method: string, path: string, form: FormData) => {
+    const res = await fetch(`${target.api}${path}`, {
+      method,
+      headers: { authorization: `Bot ${target.token}` },
+      body: form,
+    });
+    const text = await res.text();
+    let parsed: unknown = null;
+    try {
+      parsed = text ? JSON.parse(text) : null;
+    } catch {
+      parsed = { nonJson: text.slice(0, 200) };
+    }
+    return { status: res.status, body: parsed };
+  };
+  const settle = () => new Promise((r) => setTimeout(r, 1_000));
 
   const out: Record<string, Observation> = {};
   await sweep();
@@ -174,6 +203,7 @@ export async function runScenarios(
         `/channels/${channelId}/messages/pins/${messageId}`,
       );
       out.listPins = await call("GET", `/channels/${channelId}/messages/pins`);
+      out.listPinsLegacy = await call("GET", `/channels/${channelId}/pins`);
       const reactions = `/channels/${channelId}/messages/${messageId}/reactions`;
       const thumbsUp = encodeURIComponent("👍");
       out.react = await call("PUT", `${reactions}/${thumbsUp}/@me`);
@@ -186,6 +216,11 @@ export async function runScenarios(
       out.removeEmojiReactions = await call(
         "DELETE",
         `${reactions}/${thumbsUp}`,
+      );
+      await call("PUT", `${reactions}/${thumbsUp}/@me`);
+      out.removeOwnReaction = await call(
+        "DELETE",
+        `${reactions}/${thumbsUp}/@me`,
       );
       await call("PUT", `${reactions}/${thumbsUp}/@me`);
       out.removeAllReactions = await call("DELETE", reactions);
@@ -277,6 +312,14 @@ export async function runScenarios(
       out.leaveThread = await call(
         "DELETE",
         `/channels/${threadId}/thread-members/@me`,
+      );
+      out.addThreadMemberById = await call(
+        "PUT",
+        `/channels/${threadId}/thread-members/${target.botId}`,
+      );
+      out.removeThreadMemberById = await call(
+        "DELETE",
+        `/channels/${threadId}/thread-members/${target.botId}`,
       );
       out.archiveThread = await call("PATCH", `/channels/${threadId}`, {
         archived: true,
@@ -508,6 +551,49 @@ export async function runScenarios(
         `${guild}/soundboard-sounds/${soundId}`,
         { name: "contract edited" },
       );
+      // Join a voice channel over the gateway (no audio connection), play the sound, leave.
+      const voice = await call("POST", `${guild}/channels`, {
+        name: "contract-voice",
+        type: 2,
+      });
+      const voiceId = (voice.body as { id?: string })?.id;
+      if (voiceId) {
+        target.gatewaySend({
+          op: VOICE_STATE_UPDATE,
+          d: {
+            guild_id: target.guildId,
+            channel_id: voiceId,
+            // Playing a sound needs the bot neither muted nor deafened.
+            self_mute: false,
+            self_deaf: false,
+          },
+        });
+        await settle();
+        out.botVoiceStateInVoice = await call(
+          "GET",
+          `${guild}/voice-states/@me`,
+        );
+        out.botVoiceStateById = await call(
+          "GET",
+          `${guild}/voice-states/${target.botId}`,
+        );
+        out.sendSoundboardSound = await call(
+          "POST",
+          `/channels/${voiceId}/send-soundboard-sound`,
+          { sound_id: soundId },
+        );
+        target.gatewaySend({
+          op: VOICE_STATE_UPDATE,
+          d: {
+            guild_id: target.guildId,
+            channel_id: null,
+            self_mute: false,
+            self_deaf: false,
+          },
+        });
+        await settle();
+        await call("DELETE", `/channels/${voiceId}`);
+      }
       out.deleteSound = await call(
         "DELETE",
         `${guild}/soundboard-sounds/${soundId}`,
@@ -520,6 +606,16 @@ export async function runScenarios(
     if (out.setOwnNickname.status === 200)
       await call("PATCH", `${guild}/members/@me`, { nick: null });
     out.getBotMember = await call("GET", `${guild}/members/${target.botId}`);
+    // Listing members needs the Server Members intent switched on for the app.
+    out.listMembers = await call("GET", `${guild}/members?limit=1`);
+    // The bot's own nickname through its user id rather than @me.
+    out.setOwnNicknameById = await call(
+      "PATCH",
+      `${guild}/members/${target.botId}`,
+      { nick: "contract" },
+    );
+    if (out.setOwnNicknameById.status === 200)
+      await call("PATCH", `${guild}/members/@me`, { nick: null });
     const botName = (out.usersMe.body as { username?: string })?.username;
     if (botName)
       out.searchMembers = await call(
@@ -564,6 +660,58 @@ export async function runScenarios(
     out.pruneCount = await call("GET", `${guild}/prune?days=7`);
     out.unknownEmoji = await call("GET", `${guild}/emojis/1`);
     out.listStickers = await call("GET", `${guild}/stickers`);
+    {
+      const form = new FormData();
+      form.append("name", STICKER_NAMES[0]!);
+      form.append("tags", "contract");
+      form.append("description", "");
+      form.append(
+        "file",
+        new Blob([Buffer.from(STICKER_PNG, "base64")], { type: "image/png" }),
+        "sticker.png",
+      );
+      out.createSticker = await callForm("POST", `${guild}/stickers`, form);
+      const stickerId = (out.createSticker.body as { id?: string })?.id;
+      if (stickerId) {
+        out.getGuildSticker = await call(
+          "GET",
+          `${guild}/stickers/${stickerId}`,
+        );
+        out.getSticker = await call("GET", `/stickers/${stickerId}`);
+        out.editSticker = await call(
+          "PATCH",
+          `${guild}/stickers/${stickerId}`,
+          {
+            name: STICKER_NAMES[1],
+          },
+        );
+        out.deleteSticker = await call(
+          "DELETE",
+          `${guild}/stickers/${stickerId}`,
+        );
+      }
+    }
+    target.gatewaySend({
+      op: REQUEST_GUILD_MEMBERS,
+      d: { guild_id: target.guildId, user_ids: [target.botId] },
+    });
+    target.gatewaySend({
+      op: REQUEST_SOUNDBOARD_SOUNDS,
+      d: { guild_ids: [target.guildId] },
+    });
+    // An empty edit: the bot's profile and the application stay as they are.
+    out.editBotUser = await call("PATCH", "/users/@me", {});
+    const description = (out.getApplication.body as { description?: string })
+      ?.description;
+    out.editApplication = await call("PATCH", "/applications/@me", {
+      description: description ?? "",
+    });
+    // Opening a DM sends nothing; the guild owner is the one user both guilds have.
+    const ownerId = (out.getGuild.body as { owner_id?: string })?.owner_id;
+    if (ownerId)
+      out.openDm = await call("POST", "/users/@me/channels", {
+        recipient_id: ownerId,
+      });
     out.unknownScheduledEvent = await call(
       "GET",
       `${guild}/scheduled-events/1`,
