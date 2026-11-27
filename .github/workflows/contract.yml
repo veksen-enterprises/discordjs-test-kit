@@ -32,6 +32,11 @@ jobs:
           DISCORD_CONTRACT_TOKEN: ${{ secrets.DISCORD_CONTRACT_TOKEN }}
           DISCORD_CONTRACT_GUILD: "1572343051337342976"
           UPDATE_BASELINE: ${{ inputs.update_baseline && '1' || '' }}
+      # The test log cuts long output; print the differences (shapes only, no values) whole, so
+      # the baseline can be read without downloading the artifact.
+      - if: always()
+        run: |
+          [ -f contract/report.json ] && jq -c '{statusDifferences, differences}' contract/report.json || true
       - if: always()
         uses: actions/upload-artifact@v4
         with:
