@@ -30,6 +30,8 @@ jobs:
       - run: npm run test:contract
         env:
           DISCORD_CONTRACT_TOKEN: ${{ secrets.DISCORD_CONTRACT_TOKEN }}
+          # The second bot, invited with Administrator; its pass is skipped while the secret is unset.
+          DISCORD_CONTRACT_ADMIN_TOKEN: ${{ secrets.DISCORD_CONTRACT_ADMIN_TOKEN }}
           DISCORD_CONTRACT_GUILD: "1572343051337342976"
           UPDATE_BASELINE: ${{ inputs.update_baseline && '1' || '' }}
       # The test log cuts long output; print the differences (shapes only, no values) whole, so
@@ -37,6 +39,7 @@ jobs:
       - if: always()
         run: |
           [ -f contract/report.json ] && jq -c '{statusDifferences, differences}' contract/report.json || true
+          [ -f contract/report-admin.json ] && jq -c '{admin: true, statusDifferences, differences}' contract/report-admin.json || true
       - if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -44,4 +47,6 @@ jobs:
           path: |
             contract/report.json
             contract/baseline.json
+            contract/report-admin.json
+            contract/baseline-admin.json
           if-no-files-found: ignore

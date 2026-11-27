@@ -33,15 +33,13 @@ interface Named {
   name: string;
 }
 
-/**
- * Bot-triggerable requests, run in order against one Target. Each step is something a bot
- * does; user actions (slash commands, button presses) can't be triggered from a bot, so they
- * stay out of the contract.
- */
-export async function runScenarios(
-  target: Target,
-): Promise<Record<string, Observation>> {
-  const call = async (method: string, path: string, body?: unknown) => {
+/** Raw REST as the bot: JSON in and out, retrying a 429 up to three times. */
+export function requester(target: Target) {
+  return async (
+    method: string,
+    path: string,
+    body?: unknown,
+  ): Promise<Observation> => {
     for (let attempt = 0; ; attempt++) {
       const res = await fetch(`${target.api}${path}`, {
         method,
@@ -68,6 +66,17 @@ export async function runScenarios(
       return { status: res.status, body: parsed };
     }
   };
+}
+
+/**
+ * Bot-triggerable requests, run in order against one Target. Each step is something a bot
+ * does; user actions (slash commands, button presses) can't be triggered from a bot, so they
+ * stay out of the contract.
+ */
+export async function runScenarios(
+  target: Target,
+): Promise<Record<string, Observation>> {
+  const call = requester(target);
 
   const guild = `/guilds/${target.guildId}`;
   const app = `/applications/${target.botId}`;

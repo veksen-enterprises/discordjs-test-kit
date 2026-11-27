@@ -1,3 +1,4 @@
 node_modules
 dist
 contract/report.json
+contract/report-admin.json

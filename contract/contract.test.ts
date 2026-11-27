@@ -6,9 +6,14 @@
  * and that's never accepted unreviewed. Shape differences can be accepted in baseline.json.
  * A new one fails the run; so does a baseline entry that no longer occurs, so the baseline
  * only shrinks. UPDATE_BASELINE=1 rewrites it from the current run's shape differences.
+ *
+ * A second pass runs admin-scenarios.ts as a second bot invited with Administrator, when
+ * DISCORD_CONTRACT_ADMIN_TOKEN is set, against baseline-admin.json. The first bot keeps its narrow
+ * invite so its refusals stay checked.
  */
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { afterAll, describe, expect, it } from "vitest";
+import { runAdminScenarios } from "./admin-scenarios.js";
 import {
   firstDispatches,
   runScenarios,
@@ -21,6 +26,10 @@ const TOKEN = process.env.DISCORD_CONTRACT_TOKEN;
 const GUILD = process.env.DISCORD_CONTRACT_GUILD ?? "1572343051337342976";
 const BASELINE = new URL("./baseline.json", import.meta.url);
 const REPORT = new URL("./report.json", import.meta.url);
+/** The second contract bot, invited with Administrator. */
+const ADMIN_TOKEN = process.env.DISCORD_CONTRACT_ADMIN_TOKEN;
+const ADMIN_BASELINE = new URL("./baseline-admin.json", import.meta.url);
+const ADMIN_REPORT = new URL("./report-admin.json", import.meta.url);
 
 const targets: Target[] = [];
 afterAll(async () => {
@@ -30,6 +39,14 @@ afterAll(async () => {
 async function observe(target: Target) {
   targets.push(target);
   const responses = await runScenarios(target);
+  return { responses, dispatches: firstDispatches(target) };
+}
+
+async function observeAdmin(target: Target) {
+  targets.push(target);
+  const responses = await runAdminScenarios(target);
+  // Let the gateway deliver the dispatches the steps caused.
+  await new Promise((r) => setTimeout(r, 1_000));
   return { responses, dispatches: firstDispatches(target) };
 }
 
@@ -245,6 +262,153 @@ describe("scenarios against the mock", () => {
   }, 20_000);
 });
 
+interface Observed {
+  responses: Record<string, Observation>;
+  dispatches: Record<string, unknown>;
+}
+
+/**
+ * Fails on any status or code difference, and on a shape difference that isn't in `baselineFile`
+ * or a baseline entry that no longer occurs.
+ */
+function agree(
+  discord: Observed,
+  mock: Observed,
+  baselineFile: URL,
+  reportFile: URL,
+) {
+  const differences: string[] = [];
+  const statusDifferences: string[] = [];
+  const compare = (
+    section: string,
+    a: Record<string, unknown>,
+    b: Record<string, unknown>,
+  ) => {
+    for (const key of Object.keys(a).sort()) {
+      if (!(key in b)) {
+        differences.push(`${section}.${key}: Discord has it, mock doesn't`);
+        continue;
+      }
+      for (const d of diffShapes(shapeOf(a[key]), shapeOf(b[key])))
+        differences.push(`${section}.${key}.${describeDiff(d)}`);
+    }
+  };
+  const statusOf = (r: Record<string, Observation>) =>
+    Object.fromEntries(
+      Object.entries(r).map(([k, v]) => [
+        k,
+        {
+          status: v.status,
+          // An error's code is a number; an invite's `code` is its string id, not compared.
+          code: (({ code }) => (typeof code === "number" ? code : null))(
+            (v.body ?? {}) as { code?: unknown },
+          ),
+        },
+      ]),
+    );
+  for (const [key, real] of Object.entries(statusOf(discord.responses))) {
+    const ours = statusOf(mock.responses)[key];
+    if (JSON.stringify(real) !== JSON.stringify(ours))
+      statusDifferences.push(
+        `status.${key}: Discord ${JSON.stringify(real)}, mock ${JSON.stringify(ours)}`,
+      );
+  }
+  compare(
+    "rest",
+    Object.fromEntries(
+      Object.entries(discord.responses).map(([k, v]) => [k, v.body]),
+    ),
+    Object.fromEntries(
+      Object.entries(mock.responses).map(([k, v]) => [k, v.body]),
+    ),
+  );
+  compare("gateway", discord.dispatches, mock.dispatches);
+  // An event the mock sends and Discord doesn't would let a bot's handler run in tests only.
+  for (const t of Object.keys(mock.dispatches).sort())
+    if (!(t in discord.dispatches))
+      differences.push(`gateway.${t}: mock sends it, Discord doesn't`);
+
+  writeFileSync(
+    reportFile,
+    JSON.stringify({ statusDifferences, differences, discord, mock }, null, 2),
+  );
+  // The report artifact holds everything; the log gets the summary so it's readable
+  // without downloading.
+  console.log(
+    JSON.stringify(
+      {
+        statuses: {
+          discord: statusOf(discord.responses),
+          mock: statusOf(mock.responses),
+        },
+        discordDispatches: Object.keys(discord.dispatches),
+        statusDifferences,
+        differences,
+      },
+      null,
+      2,
+    ),
+  );
+  if (process.env.UPDATE_BASELINE)
+    writeFileSync(baselineFile, JSON.stringify(differences, null, 2) + "\n");
+  expect(statusDifferences).toEqual([]);
+  if (process.env.UPDATE_BASELINE) return;
+  const baseline: string[] = existsSync(baselineFile)
+    ? JSON.parse(readFileSync(baselineFile, "utf8"))
+    : [];
+  expect({
+    new: differences.filter((d) => !baseline.includes(d)),
+    fixed: baseline.filter((d) => !differences.includes(d)),
+  }).toEqual({ new: [], fixed: [] });
+}
+
+describe("admin scenarios against the mock", () => {
+  it("run end to end, with no Gaps", async () => {
+    const { responses } = await observeAdmin(await mockTarget({ admin: true }));
+    const statuses = Object.fromEntries(
+      Object.entries(responses).map(([k, v]) => [k, v.status]),
+    );
+    expect(statuses).toEqual({
+      banOwner: 403,
+      bulkBanOwner: 400,
+      createAutomodRule: 200,
+      createTemplate: 200,
+      createWebhook: 200,
+      deleteAutomodRule: 204,
+      deleteChannel: 200,
+      deleteTemplate: 200,
+      deleteWebhook: 204,
+      deleteWebhookMessage: 204,
+      deleteWebhookWithToken: 204,
+      editAutomodRule: 200,
+      editTemplate: 200,
+      editWebhook: 200,
+      editWebhookMessage: 200,
+      editWebhookWithToken: 200,
+      editWidgetSettings: 200,
+      executeWebhook: 200,
+      getAutomodRule: 200,
+      getWebhook: 200,
+      getWebhookMessage: 200,
+      getWebhookWithToken: 200,
+      getWidgetSettings: 200,
+      listAutomodRules: 200,
+      listBans: 200,
+      listChannelWebhooks: 200,
+      listGuildWebhooks: 200,
+      listPins: 200,
+      listTemplates: 200,
+      pinMessage: 204,
+      pinMessageLegacy: 204,
+      pruneCount: 200,
+      syncTemplate: 200,
+      unknownBan: 404,
+      unpinMessage: 204,
+      unpinMessageLegacy: 204,
+    });
+  }, 20_000);
+});
+
 describe.skipIf(!TOKEN)("mock against real Discord", () => {
   it(
     "agrees on statuses, error codes and shapes",
@@ -253,94 +417,21 @@ describe.skipIf(!TOKEN)("mock against real Discord", () => {
     async () => {
       const discord = await observe(await discordTarget(TOKEN!, GUILD));
       const mock = await observe(await mockTarget());
+      agree(discord, mock, BASELINE, REPORT);
+    },
+  );
+});
 
-      const differences: string[] = [];
-      const statusDifferences: string[] = [];
-      const compare = (
-        section: string,
-        a: Record<string, unknown>,
-        b: Record<string, unknown>,
-      ) => {
-        for (const key of Object.keys(a).sort()) {
-          if (!(key in b)) {
-            differences.push(`${section}.${key}: Discord has it, mock doesn't`);
-            continue;
-          }
-          for (const d of diffShapes(shapeOf(a[key]), shapeOf(b[key])))
-            differences.push(`${section}.${key}.${describeDiff(d)}`);
-        }
-      };
-      const statusOf = (r: Record<string, Observation>) =>
-        Object.fromEntries(
-          Object.entries(r).map(([k, v]) => [
-            k,
-            {
-              status: v.status,
-              // An error's code is a number; an invite's `code` is its string id, not compared.
-              code: (({ code }) => (typeof code === "number" ? code : null))(
-                (v.body ?? {}) as { code?: unknown },
-              ),
-            },
-          ]),
-        );
-      for (const [key, real] of Object.entries(statusOf(discord.responses))) {
-        const ours = statusOf(mock.responses)[key];
-        if (JSON.stringify(real) !== JSON.stringify(ours))
-          statusDifferences.push(
-            `status.${key}: Discord ${JSON.stringify(real)}, mock ${JSON.stringify(ours)}`,
-          );
-      }
-      compare(
-        "rest",
-        Object.fromEntries(
-          Object.entries(discord.responses).map(([k, v]) => [k, v.body]),
-        ),
-        Object.fromEntries(
-          Object.entries(mock.responses).map(([k, v]) => [k, v.body]),
-        ),
+describe.skipIf(!ADMIN_TOKEN)("admin bot: mock against real Discord", () => {
+  it(
+    "agrees on statuses, error codes and shapes",
+    { timeout: 240_000 },
+    async () => {
+      const discord = await observeAdmin(
+        await discordTarget(ADMIN_TOKEN!, GUILD),
       );
-      compare("gateway", discord.dispatches, mock.dispatches);
-      // An event the mock sends and Discord doesn't would let a bot's handler run in tests only.
-      for (const t of Object.keys(mock.dispatches).sort())
-        if (!(t in discord.dispatches))
-          differences.push(`gateway.${t}: mock sends it, Discord doesn't`);
-
-      writeFileSync(
-        REPORT,
-        JSON.stringify(
-          { statusDifferences, differences, discord, mock },
-          null,
-          2,
-        ),
-      );
-      // The report artifact holds everything; the log gets the summary so it's readable
-      // without downloading.
-      console.log(
-        JSON.stringify(
-          {
-            statuses: {
-              discord: statusOf(discord.responses),
-              mock: statusOf(mock.responses),
-            },
-            discordDispatches: Object.keys(discord.dispatches),
-            statusDifferences,
-            differences,
-          },
-          null,
-          2,
-        ),
-      );
-      if (process.env.UPDATE_BASELINE)
-        writeFileSync(BASELINE, JSON.stringify(differences, null, 2) + "\n");
-      expect(statusDifferences).toEqual([]);
-      if (process.env.UPDATE_BASELINE) return;
-      const baseline: string[] = existsSync(BASELINE)
-        ? JSON.parse(readFileSync(BASELINE, "utf8"))
-        : [];
-      expect({
-        new: differences.filter((d) => !baseline.includes(d)),
-        fixed: baseline.filter((d) => !differences.includes(d)),
-      }).toEqual({ new: [], fixed: [] });
+      const mock = await observeAdmin(await mockTarget({ admin: true }));
+      agree(discord, mock, ADMIN_BASELINE, ADMIN_REPORT);
     },
   );
 });

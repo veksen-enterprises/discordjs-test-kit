@@ -1,5 +1,10 @@
 import { once } from "node:events";
-import { Client, Events, GatewayIntentBits } from "discord.js";
+import {
+  Client,
+  Events,
+  GatewayIntentBits,
+  PermissionFlagsBits,
+} from "discord.js";
 import { createDiscordMock } from "../src/internal/mock.js";
 
 /** What a scenario needs from either side: raw REST, a guild to work in, and the gateway traffic. */
@@ -34,6 +39,9 @@ const INTENTS = [
   GatewayIntentBits.GuildScheduledEvents,
   GatewayIntentBits.GuildVoiceStates,
   GatewayIntentBits.GuildMessageTyping,
+  GatewayIntentBits.GuildWebhooks,
+  GatewayIntentBits.GuildModeration,
+  GatewayIntentBits.AutoModerationConfiguration,
 ];
 
 async function connect(
@@ -76,11 +84,22 @@ export async function discordTarget(
   };
 }
 
-export async function mockTarget(): Promise<Target> {
+/**
+ * The mock's copy of the test guild. `admin` is the second contract bot, invited with
+ * Administrator; the first was invited with INVITE_PERMISSIONS.
+ */
+export async function mockTarget(
+  opts: { admin?: boolean } = {},
+): Promise<Target> {
   const mock = await createDiscordMock();
   const guild = mock.createGuild("contract");
   mock.createTextChannel(guild, "general");
-  mock.createRole(guild, "contract-bot", INVITE_PERMISSIONS, [mock.state.bot]);
+  mock.createRole(
+    guild,
+    "contract-bot",
+    opts.admin ? PermissionFlagsBits.Administrator : INVITE_PERMISSIONS,
+    [mock.state.bot],
+  );
   // The test guild's @everyone, read from run 45112207562's listRoles: much wider than the
   // kit's least-privilege World (Create Events, Create Expressions, Change Nickname, threads,
   // polls, ...), so the contract world copies it exactly.
