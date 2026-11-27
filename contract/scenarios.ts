@@ -582,6 +582,16 @@ export async function runScenarios(
           `/channels/${voiceId}/send-soundboard-sound`,
           { sound_id: soundId },
         );
+        out.setVoiceStatus = await call(
+          "PUT",
+          `/channels/${voiceId}/voice-status`,
+          { status: "contract" },
+        );
+        out.clearVoiceStatus = await call(
+          "PUT",
+          `/channels/${voiceId}/voice-status`,
+          { status: null },
+        );
         target.gatewaySend({
           op: VOICE_STATE_UPDATE,
           d: {
@@ -711,6 +721,105 @@ export async function runScenarios(
     if (ownerId)
       out.openDm = await call("POST", "/users/@me/channels", {
         recipient_id: ownerId,
+      });
+    // Computed permissions: the bot and @everyone, and an unknown user and role.
+    out.channelMemberPermissions = await call(
+      "GET",
+      `/channels/${channelId}/permissions/member/${target.botId}`,
+    );
+    out.channelRolePermissions = await call(
+      "GET",
+      `/channels/${channelId}/permissions/role/${target.guildId}`,
+    );
+    out.guildMemberPermissions = await call(
+      "GET",
+      `${guild}/permissions/member/${target.botId}`,
+    );
+    out.guildRolePermissions = await call(
+      "GET",
+      `${guild}/permissions/role/${target.guildId}`,
+    );
+    out.unknownMemberPermissions = await call(
+      "GET",
+      `${guild}/permissions/member/1`,
+    );
+    out.unknownRolePermissions = await call(
+      "GET",
+      `${guild}/permissions/role/1`,
+    );
+    out.unknownChannelMemberPermissions = await call(
+      "GET",
+      `/channels/${channelId}/permissions/member/1`,
+    );
+    // Discord's own catalogues.
+    out.voiceRegions = await call("GET", "/voice/regions");
+    out.guildVoiceRegions = await call("GET", `${guild}/regions`);
+    out.defaultSounds = await call("GET", "/soundboard-default-sounds");
+    out.oauthApplication = await call("GET", "/oauth2/applications/@me");
+    // Guild settings: the test guild isn't a Community server and the invite has no Manage
+    // Server, so most of these are refused; nothing is changed.
+    out.welcomeScreen = await call("GET", `${guild}/welcome-screen`);
+    out.editWelcomeScreen = await call("PATCH", `${guild}/welcome-screen`, {
+      description: "contract",
+    });
+    out.onboarding = await call("GET", `${guild}/onboarding`);
+    out.editOnboarding = await call("PUT", `${guild}/onboarding`, {
+      enabled: false,
+    });
+    out.vanityUrl = await call("GET", `${guild}/vanity-url`);
+    out.integrations = await call("GET", `${guild}/integrations`);
+    out.deleteIntegration = await call("DELETE", `${guild}/integrations/1`);
+    out.memberVerification = await call("GET", `${guild}/member-verification`);
+    out.editMemberVerification = await call(
+      "PATCH",
+      `${guild}/member-verification`,
+      { enabled: false },
+    );
+    out.incidentActions = await call("PUT", `${guild}/incident-actions`, {
+      invites_disabled_until: null,
+    });
+    out.widgetPng = await call("GET", `${guild}/widget.png`);
+    out.roleConnectionMetadata = await call(
+      "GET",
+      `${app}/role-connections/metadata`,
+    );
+    // Writes back what's there, so the app's linked-role setup stays as it is.
+    if (out.roleConnectionMetadata.status === 200)
+      out.editRoleConnectionMetadata = await call(
+        "PUT",
+        `${app}/role-connections/metadata`,
+        out.roleConnectionMetadata.body,
+      );
+    // The app has no SKUs; made-up ids show how unknown entitlements and SKUs are refused.
+    out.skus = await call("GET", `${app}/skus`);
+    out.entitlements = await call("GET", `${app}/entitlements`);
+    out.unknownEntitlement = await call("GET", `${app}/entitlements/1`);
+    out.deleteUnknownEntitlement = await call(
+      "DELETE",
+      `${app}/entitlements/1`,
+    );
+    out.consumeUnknownEntitlement = await call(
+      "POST",
+      `${app}/entitlements/1/consume`,
+    );
+    out.createEntitlementUnknownSku = await call(
+      "POST",
+      `${app}/entitlements`,
+      { sku_id: "1", owner_id: target.guildId, owner_type: 1 },
+    );
+    out.unknownSkuSubscriptions = await call(
+      "GET",
+      `/skus/1/subscriptions?user_id=${target.botId}`,
+    );
+    // The deprecated nickname route, and adding a member with a made-up OAuth2 token.
+    out.setOwnNickLegacy = await call("PATCH", `${guild}/members/@me/nick`, {
+      nick: "contract",
+    });
+    if (out.setOwnNickLegacy.status === 200)
+      await call("PATCH", `${guild}/members/@me`, { nick: null });
+    if (ownerId)
+      out.addExistingMember = await call("PUT", `${guild}/members/${ownerId}`, {
+        access_token: "contract",
       });
     out.unknownScheduledEvent = await call(
       "GET",
