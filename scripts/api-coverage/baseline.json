@@ -6,7 +6,7 @@
     "notBotCallable": 15
   },
   "gateway": {
-    "covered": 64,
+    "covered": 66,
     "total": 79
   },
   "restCovered": [
@@ -238,6 +238,8 @@
     "TYPING_START",
     "USER_UPDATE",
     "VOICE_CHANNEL_EFFECT_SEND",
+    "VOICE_CHANNEL_START_TIME_UPDATE",
+    "VOICE_CHANNEL_STATUS_UPDATE",
     "VOICE_SERVER_UPDATE",
     "VOICE_STATE_UPDATE",
     "WEBHOOKS_UPDATE"

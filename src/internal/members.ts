@@ -169,11 +169,14 @@ export function registerMemberRoutes(
       const self = userId === bot;
 
       if ("nick" in body) {
-        // Your own nickname needs CHANGE_NICKNAME; someone else's MANAGE_NICKNAMES and the hierarchy.
-        const allowed = self
-          ? botHas(guild, Permission.ChangeNickname)
-          : botHas(guild, Permission.ManageNicknames) &&
-            outranks(guild, userId);
+        // Your own nickname through @me needs CHANGE_NICKNAME; through an id, even the bot's own,
+        // MANAGE_NICKNAMES (contract run 45915019593 got 403 50013 with Change Nickname alone),
+        // and the hierarchy for anyone else. The bot's own id with MANAGE_NICKNAMES is inferred.
+        const allowed =
+          req.params.userId === "@me"
+            ? botHas(guild, Permission.ChangeNickname)
+            : botHas(guild, Permission.ManageNicknames) &&
+              (self || outranks(guild, userId));
         if (!allowed) return respond.missingPermissions();
       }
       if ("roles" in body) {

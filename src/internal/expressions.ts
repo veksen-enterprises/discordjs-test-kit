@@ -484,7 +484,8 @@ export function registerExpressionRoutes(
         formatType,
         reason: reasonOf(req),
       });
-      return respond.json(guild.stickers.get(id));
+      // 201 without `user`, as contract runs 45914682250 and 45915019593 got from Discord.
+      return respond.json(shown(guild.stickers.get(id)!, false), 201);
     }),
   );
 
@@ -520,7 +521,8 @@ export function registerExpressionRoutes(
           reasonOf(req),
         );
       else announce(mock, guild, "sticker");
-      return respond.json(sticker);
+      // Without `user`, like the upload (contract run 45915019593).
+      return respond.json(shown(sticker, false));
     }),
   );
 

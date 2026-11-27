@@ -62,6 +62,7 @@ export function setVoiceState(
     suppress: false,
     request_to_speak_timestamp: null,
   };
+  const previous = voice.channel_id;
   if (change.channelId !== undefined) voice.channel_id = change.channelId;
   if (change.mute !== undefined) voice.mute = member.mute = change.mute;
   if (change.deaf !== undefined) voice.deaf = member.deaf = change.deaf;
@@ -77,6 +78,48 @@ export function setVoiceState(
     { ...voice, member },
     GatewayIntentBits.GuildVoiceStates,
   );
+  if (previous !== voice.channel_id)
+    voiceSessions(mock, guild, previous, voice.channel_id);
+}
+
+/**
+ * A voice channel's session starts with its first member and ends with its last
+ * (gateway-events#voice-channel-start-time-update: "Sent when a voice channel session is started
+ * or ended", null when ended), both under GUILDS (using-gateway#list-of-intents). Contract run
+ * 45915019593 got the start right after the bot's own VOICE_STATE_UPDATE, and a
+ * VOICE_CHANNEL_STATUS_UPDATE with a null status once it left. That the status clears when the
+ * session ends, and the order of the two events then, are inferred, not checked.
+ */
+function voiceSessions(
+  mock: DiscordMock,
+  guild: GuildRecord,
+  left: string | null,
+  joined: string | null,
+) {
+  const inside = (channelId: string) =>
+    [...(mock.state.voiceStates.get(guild.id)?.values() ?? [])].filter(
+      (v) => v.channel_id === channelId,
+    ).length;
+  const send = (t: GatewayDispatchEvents, d: Record<string, unknown>) =>
+    mock.gateway.dispatch(t, d, GatewayIntentBits.Guilds);
+  if (joined && inside(joined) === 1)
+    send(GatewayDispatchEvents.VoiceChannelStartTimeUpdate, {
+      id: joined,
+      guild_id: guild.id,
+      voice_start_time: Math.floor(Date.now() / 1000),
+    });
+  if (left && inside(left) === 0) {
+    send(GatewayDispatchEvents.VoiceChannelStartTimeUpdate, {
+      id: left,
+      guild_id: guild.id,
+      voice_start_time: null,
+    });
+    send(GatewayDispatchEvents.VoiceChannelStatusUpdate, {
+      id: left,
+      guild_id: guild.id,
+      status: null,
+    });
+  }
 }
 
 /**

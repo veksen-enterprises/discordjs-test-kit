@@ -113,3 +113,45 @@ it("refuses to move a member without Move Members, and a member can't join witho
   );
   expect(() => mock.joinVoice(guild, alice, games)).toThrow("Connect");
 });
+
+it("tells the bot when a voice channel's session starts and ends", async () => {
+  // Arrange
+  const { guild, lobby, alice } = world();
+  await login();
+  const sessions: { t: string; d: Record<string, unknown> }[] = [];
+  client.on(
+    Events.Raw,
+    (packet: { t?: string; d: Record<string, unknown> }) => {
+      if (packet.t?.startsWith("VOICE_CHANNEL_"))
+        sessions.push({ t: packet.t, d: packet.d });
+    },
+  );
+
+  // Act
+  let move = nextMove();
+  mock.joinVoice(guild, alice, lobby);
+  await move;
+  move = nextMove();
+  mock.joinVoice(guild, alice, null);
+  await move;
+
+  // Assert
+  expect(sessions).toEqual([
+    {
+      t: "VOICE_CHANNEL_START_TIME_UPDATE",
+      d: {
+        id: lobby.id,
+        guild_id: guild.id,
+        voice_start_time: expect.any(Number),
+      },
+    },
+    {
+      t: "VOICE_CHANNEL_START_TIME_UPDATE",
+      d: { id: lobby.id, guild_id: guild.id, voice_start_time: null },
+    },
+    {
+      t: "VOICE_CHANNEL_STATUS_UPDATE",
+      d: { id: lobby.id, guild_id: guild.id, status: null },
+    },
+  ]);
+});
